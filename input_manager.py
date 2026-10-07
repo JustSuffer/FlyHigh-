@@ -22,6 +22,15 @@ class InputManager:
         # Action triggers (down, pressed, released)
         self.jump_pressed = False
         self.jump_down = False
+        self.ctrl_down = False
+        self.ctrl_pressed = False
+        self.e_down = False
+        self.e_pressed = False
+        self.lmb_pressed = False
+        self.lmb_down = False
+        self.rmb_pressed = False
+        self.rmb_down = False
+
         self.bump_pressed = False
         self.set_pressed = False
         self.spike_pressed = False
@@ -53,14 +62,44 @@ class InputManager:
         if pr.is_key_down(pr.KEY_A) or pr.is_key_down(pr.KEY_LEFT):
             kb_move_x += 1.0  # Screen Left  -> World +X
 
+        # Raw key & mouse button polling
+        self.ctrl_down = (
+            pr.is_key_down(pr.KEY_LEFT_CONTROL) or
+            pr.is_key_down(pr.KEY_RIGHT_CONTROL) or
+            (has_gamepad and (
+                pr.is_gamepad_button_down(self.gamepad_id, pr.GAMEPAD_BUTTON_LEFT_TRIGGER_1) or
+                pr.get_gamepad_axis_movement(self.gamepad_id, pr.GAMEPAD_AXIS_LEFT_TRIGGER) > 0.3
+            ))
+        )
+        self.ctrl_pressed = (
+            pr.is_key_pressed(pr.KEY_LEFT_CONTROL) or
+            pr.is_key_pressed(pr.KEY_RIGHT_CONTROL) or
+            (has_gamepad and pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_LEFT_TRIGGER_1))
+        )
+
+        self.e_down = (
+            pr.is_key_down(pr.KEY_E) or
+            (has_gamepad and pr.is_gamepad_button_down(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_LEFT))
+        )
+        self.e_pressed = (
+            pr.is_key_pressed(pr.KEY_E) or
+            (has_gamepad and pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_LEFT))
+        )
+
+        self.lmb_pressed = pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_LEFT)
+        self.lmb_down = pr.is_mouse_button_down(pr.MOUSE_BUTTON_LEFT)
+        self.rmb_pressed = pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_RIGHT)
+        self.rmb_down = pr.is_mouse_button_down(pr.MOUSE_BUTTON_RIGHT)
+
         kb_active = (kb_move_x != 0.0 or kb_move_z != 0.0 or
                      pr.is_key_pressed(pr.KEY_SPACE) or
+                     pr.is_key_pressed(pr.KEY_E) or
+                     pr.is_key_pressed(pr.KEY_LEFT_CONTROL) or
                      pr.is_key_pressed(pr.KEY_J) or pr.is_key_pressed(pr.KEY_K) or
                      pr.is_key_pressed(pr.KEY_L) or pr.is_key_pressed(pr.KEY_LEFT_SHIFT) or
                      pr.is_key_pressed(pr.KEY_TAB) or pr.is_key_pressed(pr.KEY_ESCAPE) or
                      pr.is_key_pressed(pr.KEY_ENTER) or
-                     pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_LEFT) or
-                     pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_RIGHT))
+                     self.lmb_pressed or self.rmb_pressed)
 
         # --- Gamepad Movement & Aiming ---
         gp_active = False
@@ -149,40 +188,34 @@ class InputManager:
             has_gamepad and pr.is_gamepad_button_down(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_DOWN)
         )
 
-        # BUMP (J / Left Click / Gamepad X)
+        # BUMP / RECEIVE (L-CTRL / J / Gamepad LB / X)
         self.bump_pressed = (
+            self.ctrl_pressed or
             pr.is_key_pressed(pr.KEY_J) or
-            pr.is_key_pressed(pr.KEY_Z) or
-            pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_LEFT) or
             (has_gamepad and pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_LEFT))
         )
 
-        # SET (K / Right Click / Gamepad Y)
+        # SET / PASS (Right Click / K / Gamepad Y)
         self.set_pressed = (
+            self.rmb_pressed or
             pr.is_key_pressed(pr.KEY_K) or
-            pr.is_key_pressed(pr.KEY_X) or
-            pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_RIGHT) or
             (has_gamepad and pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_UP))
         )
 
-        # SPIKE (Space in air or L or Gamepad B / A)
+        # SPIKE / HIT (Left Click / Space in air / Gamepad B or A)
         self.spike_pressed = (
+            self.lmb_pressed or
             pr.is_key_pressed(pr.KEY_L) or
-            pr.is_key_pressed(pr.KEY_SPACE) or
             (has_gamepad and (
-                pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_DOWN) or
                 pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)
             ))
         )
 
-        # DIVE (Shift / C / Gamepad RB or B)
+        # DIVE (Shift / C / Gamepad RB)
         self.dive_pressed = (
             pr.is_key_pressed(pr.KEY_LEFT_SHIFT) or
             pr.is_key_pressed(pr.KEY_C) or
-            (has_gamepad and (
-                pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_TRIGGER_1) or
-                pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)
-            ))
+            (has_gamepad and pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_TRIGGER_1))
         )
 
         # CAMERA (Tab / V / Gamepad Select)
@@ -206,6 +239,27 @@ class InputManager:
             (has_gamepad and pr.is_gamepad_button_pressed(self.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_DOWN))
         )
 
+    # --- Compound Action Helpers ---
+    @property
+    def is_roll_dig_triggered(self):
+        """L-CTRL held + Right Click: Acrobatic diving roll dig towards landing spot."""
+        return self.ctrl_down and self.rmb_pressed
+
+    @property
+    def is_air_bailout_triggered(self):
+        """L-CTRL held + Left Click in air: Emergency tap/bailout when out of reach."""
+        return self.ctrl_down and self.lmb_pressed
+
+    @property
+    def is_float_serve_triggered(self):
+        """In-air: Left Click + E simultaneously or E held with Left Click."""
+        return (self.lmb_pressed and self.e_down) or (self.e_pressed and self.lmb_down)
+
+    @property
+    def is_setter_dump_triggered(self):
+        """Grounded: Right Click held + E pressed (or E held + Right Click)."""
+        return (self.rmb_down and self.e_pressed) or (self.e_down and self.rmb_pressed)
+
     def trigger_rumble(self, left_motor=0.6, right_motor=0.8, duration=0.25):
         """Vibrates the connected gamepad if supported."""
         if pr.is_gamepad_available(self.gamepad_id):
@@ -219,23 +273,29 @@ class InputManager:
         if self.active_device == "GAMEPAD":
             prompts = {
                 "JUMP": "(A)",
-                "BUMP": "(X)",
-                "SET": "(Y)",
+                "RECEIVE": "(LT) / (X)",
+                "PASS": "(Y)",
                 "SPIKE": "(A) / (B)",
-                "DIVE": "(RB)",
-                "SERVE": "Toss: (A) | Hit: (A)/(B)",
+                "DUMP": "(X)",
+                "SETTER_DUMP": "(Y) + (X)",
+                "ROLL_DIG": "(LT) + (Y)",
+                "AIR_BAILOUT": "(LT) + (A)",
+                "FLOAT_SERVE": "(A) + (X)",
                 "CAMERA": "(BACK)",
                 "PAUSE": "(START)",
             }
         else:
             prompts = {
                 "JUMP": "[SPACE]",
-                "BUMP": "[J] / L-Click",
-                "SET": "[K] / R-Click",
-                "SPIKE": "[SPACE] / [L]",
-                "DIVE": "[SHIFT]",
-                "SERVE": "Toss: [SPACE] | Hit: [SPACE]/[L]",
-                "CAMERA": "[TAB] / [V]",
+                "RECEIVE": "[L-CTRL]",
+                "PASS": "[R-CLICK]",
+                "SPIKE": "[L-CLICK]",
+                "DUMP": "[E]",
+                "SETTER_DUMP": "[R-CLICK + E]",
+                "ROLL_DIG": "[L-CTRL + R-CLICK]",
+                "AIR_BAILOUT": "[L-CTRL + L-CLICK]",
+                "FLOAT_SERVE": "[L-CLICK + E]",
+                "CAMERA": "[TAB]",
                 "PAUSE": "[ESC]",
             }
         return prompts.get(action_name, "")

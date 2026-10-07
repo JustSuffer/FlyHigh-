@@ -162,6 +162,17 @@ class AudioManager:
             return
         pr.play_sound(self.sounds[name])
 
+    def set_volume(self, vol):
+        self.volume = max(0.0, min(1.0, vol))
+        for snd in self.sounds.values():
+            try:
+                pr.set_sound_volume(snd, self.volume)
+            except Exception:
+                pass
+
+    def change_volume(self, delta):
+        self.set_volume(self.volume + delta)
+
     def toggle_mute(self):
         self.enabled = not self.enabled
 

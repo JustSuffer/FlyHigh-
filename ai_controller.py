@@ -69,6 +69,9 @@ class TeamAIController:
         target_char_idx = None
         if is_ball_on_my_side and ball.in_air and not ball.has_bounced:
             pred_x = max(-HALF_WIDTH + 0.4, min(HALF_WIDTH - 0.4, ball.predict_x))
+            if ball.is_float and self.difficulty != AIDifficulty.HARD:
+                # Knuckleball wobbles in the air, creating slight reception misjudgment!
+                pred_x += random.uniform(-0.5, 0.5)
             if self.team == Team.OPPONENT:
                 pred_z = max(0.5, min(HALF_LENGTH - 0.5, ball.predict_z))
             else:

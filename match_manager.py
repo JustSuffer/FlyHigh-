@@ -131,9 +131,15 @@ class MatchManager:
                 if is_in:
                     # Ball landed IN! Point goes to the opposite side of where it landed
                     if ball_on_player_side:
-                        self.award_point(Team.OPPONENT, "In Bounds!")
+                        if self.last_touch_team == Team.OPPONENT and self.touches_player == 0:
+                            self.award_point(Team.OPPONENT, "SERVICE ACE!")
+                        else:
+                            self.award_point(Team.OPPONENT, "In Bounds!")
                     else:
-                        self.award_point(Team.PLAYER, "In Bounds!")
+                        if self.last_touch_team == Team.PLAYER and self.touches_opponent == 0:
+                            self.award_point(Team.PLAYER, "SERVICE ACE!")
+                        else:
+                            self.award_point(Team.PLAYER, "In Bounds!")
                 else:
                     # Ball landed OUT! Point goes to defending team (opposite of last hitter)
                     if self.last_touch_team == Team.PLAYER:
@@ -141,7 +147,7 @@ class MatchManager:
                     elif self.last_touch_team == Team.OPPONENT:
                         self.award_point(Team.PLAYER, "Out of Bounds!")
                     else:
-                        self.award_point(Team.PLAYER if ball_on_player_side else Team.OPPONENT, "Out!")
+                        self.award_point(Team.PLAYER if ball_on_player_side else Team.OPPONENT, "Out of Bounds!")
 
             # 2. Check if ball dropped too far out
             if abs(ball.x) > 9.0 or abs(ball.z) > 14.0 or ball.y < -1.0:

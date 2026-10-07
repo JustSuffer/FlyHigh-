@@ -1,67 +1,80 @@
 # 🏐 FlyHigh! - 3D Arcade Volleyball Game (3v3 Edition)
 
-**FlyHigh!**, modern arcade anime voleybol tarzında tasarlanmış; dinamik, akıcı ve yüksek tempolu bir 3D voleybol oyunudur.
-
-Hem **klavye/fare** hem de **joystick / gamepad (Xbox, PlayStation, Logitech vb.)** ile sorunsuz oynanabilir. Modüler Python & Raylib mimarisi sayesinde ultra-komplike olmadan her türlü yeni mekaniğe ve geliştirmeye esneklik sağlar. Tek bir komut veya `.bat` dosyası ile bağımsız Windows `.exe` dosyası olarak paketlenebilir.
+**FlyHigh!** is a high-tempo, arcade 3D volleyball game inspired by *Just Volleyball* and sports anime. Built with Raylib and Python, it delivers responsive arcade gameplay with full support for both keyboard/mouse and gamepad controllers.
 
 ---
 
-## 🌟 Yeni ve Öne Çıkan Özellikler (v1.2 Güncellemesi)
+## 🌟 Key Features
 
-1. **3v3 Takım Maçları:**
-   - 1v1 yerine gerçekçi **3 vs 3** takım formatı:
-     - **Takımımız (3 Kişi):** Kaptan (Siz / #5), Pasör (AI Teammate #2), Smaçör/Blokör (AI Teammate #4).
-     - **Rakip Takım (3 Kişi):** Smaçör Kaptan (#1), Pasör (#3), Libero/Defans (#6).
-   - **Oyuncu Önceliği Kuralı (Player Priority):** Top size yakın düştüğünde takım arkadaşlarınız topu çalmaz, sizin manşet/pas/smaç vurmanız için alan açar!
-2. **Modern Anime Chibi Karakter Tasarımı:**
-   - Kutu/dikdörtgen modeller yerine; gümüş/beyaz dikenli anime saçlı, badem gözlü, sevimli yüz hatlarına sahip şık sporcu modeli.
-   - **Yüzen Küresel Eller (Chibi Arcade Style):** Manşette birbirine kenetlenen, pas kaldırırken baş üstünde toplanan, smaç anında ateşlenen dinamik küre eller.
-   - Beyaz kolsuz voleybol forması (#5 numara), turkuaz şort, siyah dizlikler ve mor boğazlı lacivert spor ayakkabılar.
-3. **Tatlı ve Modern Arcade Ana Menü:**
-   - Arkada dönen 3D stadyum kamerası, dinamik buton vurguları (hover), zorluk ayarı (Kolay / Normal / Zor), tuş rehberi modal penceresi ve ses açma/kapama.
-4. **Düzeltilmiş ve Akıcı Yön Kontrolleri:**
-   - `D` tuşu ve sağ analog çubuk artık ekranda doğrudan **SAĞA**, `A` tuşu ve sol analog çubuk doğrudan **SOLA** hareket eder.
-5. **Arcade Vuruş Bildirimleri & Titreşim:**
-   - Başarılı manşette `"NICE DIG!"`, pasa kalkınca `"PERFECT SET!"`, sert smaçta `"BOOM SPIKE!!"` dinamik görsel popupları ve Gamepad titreşim (rumble) desteği.
-6. **Derinlik Algısı ve İniş Göstergesi (Landing Reticle):**
-   - 3D sahada topun düşeceği yeri tam kestirebilmek için zeminde dinamik gölge ve iniş anına doğru daralan hedef halkası.
-7. **Tek Tıkla `.exe` Derleme:**
-   - `build_exe.bat` ile bağımsız `FlyHigh_Volleyball.exe` üretilir.
+1. **3v3 Team Matchups:**
+   - Full 3 vs 3 roster format:
+     - **Your Team (3 Players):** Captain (Player / #5), Setter (AI #2), Wing Blocker (AI #4).
+     - **Opponent Team (3 Players):** Rival Captain (#1), Opponent Setter (#3), Libero/Server (#6).
+   - **Player Priority System:** AI teammates intelligently yield reception space when you are near the ball's landing point.
+
+2. **NBA 2K-Style Shot Timing Meter:**
+   - Visual timing meter appears when jumping for serves and spikes:
+     - **Green (Perfect Timing):** Explosive 26 m/s power spike line-drive, or devastating knuckleball Float Serve!
+     - **Yellow (Good Timing):** Solid, accurate 18.5 m/s hit.
+     - **Red (Off-Time Contact):** Weak, inaccurate mismit popping high and slow.
+
+3. **Authentic Volleyball Moves & Mechanics:**
+   - **Hold & Toss Serve:** The ball starts locked in the server's hands at the baseline. Press `SPACE` or `L-CLICK` to toss the ball high into the air, then jump and strike!
+   - **Knuckleball Float Serve:** In mid-air, hit with `Left Click + E` on Green timing. The ball produces zero spin with erratic aerodynamic air wobbles and sharp drops over the net!
+   - **Acrobatic Roll Dig:** Grounded `L-CTRL + Right Click` triggers a diving roll across the floor to save distant landing balls right before impact, popping the ball towards your reticle (5-second cooldown).
+   - **Setter Dump:** Grounded `Right Click + E` executes a surprise tip-over attack directly into the opponent's unguarded court.
+   - **Emergency Air Bailout:** In mid-air, `L-CTRL + Left Click` allows an emergency extended one-hand tap/kick over the net to save the rally.
+   - **Bump / Receive:** Grounded `L-CTRL` digs the ball towards your mouse cursor reticle.
+   - **Overhead Set:** `Right Click` sends a floating, high-arcing pass to your cursor target.
+
+4. **Complete In-Game Settings Menu:**
+   - Master Volume slider (0% to 100%) and Mute toggle.
+   - Display Mode: Windowed vs Borderless Fullscreen.
+   - Resolution presets: 1280x720 (HD), 1600x900, 1920x1080 (FHD).
+   - Default Camera angle presets (Behind Player, Side Broadcast, Dynamic Action, Top-Down).
+
+5. **100% English & Volleyball Terminology:**
+   - Clean, airy typography with zero character glyph corruption.
+   - Authentic terminology (`DIG`, `SET`, `SPIKE`, `FLOAT SERVE`, `SETTER DUMP`, `ROLL DIG`, `ACE!`, `OUT OF BOUNDS!`).
 
 ---
 
-## 🎮 Kontroller (Controls)
+## 🎮 Controls Reference
 
-| Aksiyon | Klavye & Fare | Joystick / Gamepad (Xbox / PS) |
+| Action | Keyboard & Mouse | Gamepad / Joystick (Xbox / PS) |
 | :--- | :--- | :--- |
-| **Sağa Git** | `D` / Sağ Ok Tuşu | **Sol Analog Sağa** / D-Pad Sağ |
-| **Sola Git** | `A` / Sol Ok Tuşu | **Sol Analog Sola** / D-Pad Sol |
-| **İleri Git (Fileye)** | `W` / Yukarı Ok | **Sol Analog Yukarı** / D-Pad Yukarı |
-| **Geri Çekil** | `S` / Aşağı Ok | **Sol Analog Aşağı** / D-Pad Aşağı |
-| **Hedef Alma (Nişan)** | Yön Tuşları / Mouse | **Sağ Analog Çubuk** |
-| **Sıçrama / Smaç** | `Boşluk (SPACE)` | **(A)** / Çarpı (Cross) |
-| **Servis Fırlat (Toss)** | `Boşluk (SPACE)` veya `J` | **(A)** veya **(X)** |
-| **Manşet (1. Vuruş)** | `J` / Sol Tık / `Z` | **(X)** / Kare (Square) |
-| **Pas (2. Vuruş)** | `K` / Sağ Tık / `X` | **(Y)** / Üçgen (Triangle) |
-| **Smaç Vuruşu (Havada)** | `Boşluk (SPACE)` veya `L` | **(A)** veya **(B)** |
-| **Plonjon (Kurtarma)** | `Sol Shift` veya `C` | **(RB)** / R1 veya **(B)** |
-| **Kamera Değiştirme** | `TAB` veya `V` | **(VIEW / BACK)** |
-| **Menü / Duraklatma** | `ESC` veya `P` | **(START / MENU)** |
+| **Move** | `[W, A, S, D]` (`D` = Screen Right) | **Left Stick** / D-Pad |
+| **Aim Reticle** | **Mouse Cursor** (Court Floor) | **Right Stick** |
+| **Jump** | `[SPACE]` (Always Active) | **(A)** / Cross |
+| **Serve Toss** | `[SPACE]` or `[L-CLICK]` | **(A)** or **(X)** |
+| **Power Spike (In-Air)** | `[L-CLICK]` (Timing Meter) | **(A)** (Timing Meter) |
+| **Float Serve (In-Air)** | `[L-CLICK + E]` (Green Timing) | **(A) + (X)** |
+| **Dump / Soft Tip (In-Air)** | `[E]` (Tip over block) | **(X)** |
+| **Air Bailout (In-Air)** | `[L-CTRL + L-CLICK]` | **(LT) + (A)** |
+| **Overhead Pass / Set** | `[R-CLICK]` | **(Y)** / Triangle |
+| **Setter Dump (Grounded)** | `[R-CLICK + E]` | **(Y) + (X)** |
+| **Receive / Dig (Grounded)** | `[L-CTRL]` (Aims to cursor) | **(LT)** or **(X)** |
+| **Roll Dig (5s Cooldown)** | `[L-CTRL + R-CLICK]` | **(LT) + (Y)** |
+| **Camera View** | `[TAB]` | **(BACK / VIEW)** |
+| **Pause / Menu** | `[ESC]` (Does not exit game!) | **(START / MENU)** |
 
 ---
 
-## 🚀 Çalıştırma Yöntemleri
+## 🚀 Running & Building
 
-### 1. Hazır `.exe` Dosyasını Başlatma
-Doğrudan derlenmiş bağımsız yürütülebilir dosyaya çift tıklayabilirsiniz:
+### 1. Run Pre-Built Standalone Executable
+Launch the bundled executable directly:
 📁 `dist\FlyHigh_Volleyball\FlyHigh_Volleyball.exe`
 
-### 2. Python ile Çalıştırma
-Klasör içindeki **`run_game.bat`** dosyasına çift tıklayabilir veya terminalden:
+### 2. Run via Python
 ```bash
 python main.py
 ```
+*(Or double-click `run_game.bat`)*
 
-### 3. Yeni `.exe` Derleme
-Kod üzerinde değişiklik yaptıktan sonra yeni `.exe` üretmek için:
-- **`build_exe.bat`** dosyasına çift tıklamanız yeterlidir.
+### 3. Rebuild Standalone `.exe`
+Run the automated build script:
+```bash
+build_exe.bat
+```
+This produces an updated, standalone distribution package in `dist\FlyHigh_Volleyball\`.

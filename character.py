@@ -77,8 +77,10 @@ class Character:
         # Action & Animation
         self.action = PlayerAction.IDLE
         self.action_timer = 0.0
+        self.action_duration = 0.35
         self.is_grounded = True
         self.anim_time = 0.0
+        self.roll_dig_cooldown = 0.0
         
         # Trail & Particle effects on spikes
         self.spike_spark_timer = 0.0
@@ -93,23 +95,31 @@ class Character:
         self.is_grounded = True
         self.action = PlayerAction.IDLE
         self.action_timer = 0.0
+        self.action_duration = 0.35
         self.facing_angle = 0.0 if self.team == Team.PLAYER else math.pi
 
     def jump(self):
-        if self.is_grounded:
+        if self.is_grounded and self.action != PlayerAction.ROLL_DIG:
             self.vy = PLAYER_JUMP_FORCE
             self.is_grounded = False
             self.action = PlayerAction.JUMP
             self.action_timer = 0.0
+            self.action_duration = 0.35
 
     def trigger_action(self, action, duration=0.35):
         self.action = action
+        self.action_duration = duration
         self.action_timer = duration
         if action == PlayerAction.SPIKE:
             self.spike_spark_timer = 0.35
+        elif action == PlayerAction.ROLL_DIG:
+            self.roll_dig_cooldown = 5.0
 
     def update(self, dt, move_dir_x=0.0, move_dir_z=0.0, look_target=None):
         self.anim_time += dt
+
+        if self.roll_dig_cooldown > 0.0:
+            self.roll_dig_cooldown = max(0.0, self.roll_dig_cooldown - dt)
 
         if self.action_timer > 0.0:
             self.action_timer -= dt
@@ -311,40 +321,87 @@ class Character:
         pr.draw_cylinder(pr.Vector3(px + forward_x * 0.18, head_y + 0.16, pz + forward_z * 0.18), 0.08, 0.02, 0.12, 5, self.color_hair)
 
         # 10. FLOATING SPHERICAL HANDS (Rayman / Chibi style, exactly as in reference photo!)
-        # Dynamic hand positions based on action
+        # 10. FLOATING SPHERICAL HANDS & PROCEDURAL POSES
         hand_rad = 0.135
         arm_bob = math.sin(self.anim_time * 15.0) * 0.12 if self.action == PlayerAction.RUN else idle_bob * 2.0
+        prog = 1.0 - (self.action_timer / max(0.001, self.action_duration)) if self.action_timer > 0.0 else 0.0
 
         if self.action == PlayerAction.BUMP:
-            # Bump (Manşet): Both spheres snapped together directly in front of the waist/chest
-            h1 = pr.Vector3(px + forward_x * 0.42 - right_x * 0.08, base_y + 0.88, pz + forward_z * 0.42 - right_z * 0.08)
-            h2 = pr.Vector3(px + forward_x * 0.42 + right_x * 0.08, base_y + 0.88, pz + forward_z * 0.42 + right_z * 0.08)
+            # Bump / Receive (Manşet): Knees deeply bent, hands clasped rigidly in front
+            h1 = pr.Vector3(px + forward_x * 0.44 - right_x * 0.07, base_y + 0.80, pz + forward_z * 0.44 - right_z * 0.07)
+            h2 = pr.Vector3(px + forward_x * 0.44 + right_x * 0.07, base_y + 0.80, pz + forward_z * 0.44 + right_z * 0.07)
             pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
             pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
-            # Energy link between hands
-            pr.draw_cylinder(h1, 0.08, 0.08, 0.16, 6, pr.Color(255, 230, 180, 200))
+            # Energy link / forearm platform between hands
+            pr.draw_cylinder(h1, 0.07, 0.07, 0.14, 6, pr.Color(255, 230, 180, 220))
 
         elif self.action == PlayerAction.SET:
-            # Set (Pas): Both spheres raised high above forehead
-            h1 = pr.Vector3(px + forward_x * 0.18 - right_x * 0.20, head_y + 0.28, pz + forward_z * 0.18 - right_z * 0.20)
-            h2 = pr.Vector3(px + forward_x * 0.18 + right_x * 0.20, head_y + 0.28, pz + forward_z * 0.18 + right_z * 0.20)
+            # Set / Overhead Pass: Hands raised high in overhead triangular setting cup
+            set_lift = 0.05 * math.sin(prog * math.pi)
+            h1 = pr.Vector3(px + forward_x * 0.20 - right_x * 0.19, head_y + 0.30 + set_lift, pz + forward_z * 0.20 - right_z * 0.19)
+            h2 = pr.Vector3(px + forward_x * 0.20 + right_x * 0.19, head_y + 0.30 + set_lift, pz + forward_z * 0.20 + right_z * 0.19)
             pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
             pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
 
         elif self.action == PlayerAction.SPIKE:
-            # Spike (Smaç): Hitting hand surged forward high, other hand balancing
-            spike_hand = pr.Vector3(px + forward_x * 0.55 + right_x * 0.24, head_y + 0.35, pz + forward_z * 0.55 + right_z * 0.24)
-            off_hand   = pr.Vector3(px - forward_x * 0.15 - right_x * 0.32, base_y + 1.10, pz - forward_z * 0.15 - right_z * 0.32)
-            pr.draw_sphere(spike_hand, hand_rad * 1.15, COLOR_SKIN)
+            # Dynamic Spike Swing: Wind-up -> Explosive downward whip!
+            if prog < 0.32:
+                # Wind-up: Right hitting hand cocked back high over shoulder, off hand aiming
+                spike_hand = pr.Vector3(px - forward_x * 0.18 + right_x * 0.30, head_y + 0.42, pz - forward_z * 0.18 + right_z * 0.30)
+                off_hand   = pr.Vector3(px + forward_x * 0.42 - right_x * 0.16, head_y + 0.18, pz + forward_z * 0.42 - right_z * 0.16)
+            else:
+                # Power Whip follow-through across the body
+                whip_t = (prog - 0.32) / 0.68
+                sh_fwd = 0.15 + 0.50 * (1.0 - math.cos(whip_t * math.pi * 0.5))
+                sh_h = head_y + 0.42 - 0.70 * whip_t
+                spike_hand = pr.Vector3(px + forward_x * sh_fwd + right_x * (0.30 - 0.45 * whip_t), sh_h, pz + forward_z * sh_fwd + right_z * (0.30 - 0.45 * whip_t))
+                off_hand   = pr.Vector3(px - forward_x * 0.20 - right_x * 0.30, base_y + 0.95, pz - forward_z * 0.20 - right_z * 0.30)
+
+            pr.draw_sphere(spike_hand, hand_rad * 1.18, COLOR_SKIN)
             pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
 
-            # Arcade burst aura on power spike hand!
             if self.spike_spark_timer > 0.0:
-                pr.draw_sphere(spike_hand, hand_rad * 1.5, pr.Color(255, 215, 0, 140))
-                pr.draw_sphere(spike_hand, hand_rad * 2.0, pr.Color(255, 100, 30, 80))
+                pr.draw_sphere(spike_hand, hand_rad * 1.5, pr.Color(255, 215, 0, 150))
+                pr.draw_sphere(spike_hand, hand_rad * 2.2, pr.Color(255, 90, 20, 90))
+
+        elif self.action == PlayerAction.DUMP:
+            # Dump / Soft Tip: Subtle high touch feathering ball over net
+            dump_hand = pr.Vector3(px + forward_x * 0.40 + right_x * 0.12, head_y + 0.32, pz + forward_z * 0.40 + right_z * 0.12)
+            off_hand  = pr.Vector3(px - forward_x * 0.10 - right_x * 0.28, base_y + 1.05, pz - forward_z * 0.10 - right_z * 0.28)
+            pr.draw_sphere(dump_hand, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+            # Soft touch cyan aura
+            pr.draw_sphere(dump_hand, hand_rad * 1.3, pr.Color(40, 220, 255, 120))
+
+        elif self.action == PlayerAction.SETTER_DUMP:
+            # Setter Dump: Deceptive swift push straight over net
+            dump_hand = pr.Vector3(px + forward_x * 0.52 + right_x * 0.08, head_y + 0.15, pz + forward_z * 0.52 + right_z * 0.08)
+            off_hand  = pr.Vector3(px - forward_x * 0.15 - right_x * 0.25, base_y + 0.95, pz - forward_z * 0.15 - right_z * 0.25)
+            pr.draw_sphere(dump_hand, hand_rad * 1.1, COLOR_SKIN)
+            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(dump_hand, hand_rad * 1.4, pr.Color(255, 215, 0, 130))
+
+        elif self.action == PlayerAction.ROLL_DIG:
+            # Acrobatic Roll Dig: Diving tumble roll across floor, scoops ball up
+            roll_angle = prog * 2.0 * math.pi
+            reach_dist = 0.55 + 0.35 * math.sin(roll_angle)
+            h1 = pr.Vector3(px + forward_x * reach_dist + right_x * 0.12, base_y + 0.20, pz + forward_z * reach_dist + right_z * 0.12)
+            h2 = pr.Vector3(px - forward_x * 0.20 - right_x * 0.22, base_y + 0.35, pz - forward_z * 0.20 - right_z * 0.22)
+            pr.draw_sphere(h1, hand_rad * 1.1, COLOR_SKIN)
+            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+            # Gold speed ring during roll
+            pr.draw_circle_3d(pr.Vector3(px, 0.08, pz), 0.7, pr.Vector3(0, 1, 0), 0.0, pr.Color(255, 215, 0, 130))
+
+        elif self.action == PlayerAction.AIR_BAILOUT:
+            # Emergency Air Bailout: One-hand / foot reach in mid-air
+            reach_hand = pr.Vector3(px + forward_x * 0.70 + right_x * 0.10, head_y + 0.40, pz + forward_z * 0.70 + right_z * 0.10)
+            off_hand   = pr.Vector3(px - forward_x * 0.30 - right_x * 0.30, base_y + 0.90, pz - forward_z * 0.30 - right_z * 0.30)
+            pr.draw_sphere(reach_hand, hand_rad * 1.1, COLOR_SKIN)
+            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(reach_hand, hand_rad * 1.4, pr.Color(255, 120, 60, 130))
 
         elif self.action == PlayerAction.CELEBRATE:
-            # Celebrate: Hands held high in victory \o/
+            # Celebrate: Hands held high in victory
             h1 = pr.Vector3(px - right_x * 0.36, head_y + 0.32, pz - right_z * 0.36)
             h2 = pr.Vector3(px + right_x * 0.36, head_y + 0.32, pz + right_z * 0.36)
             pr.draw_sphere(h1, hand_rad, COLOR_SKIN)

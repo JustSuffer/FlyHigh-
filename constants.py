@@ -66,13 +66,31 @@ class PlayerAction(Enum):
     IDLE = auto()
     RUN = auto()
     JUMP = auto()
-    BUMP = auto()     # Manşet (Dig / Receive)
-    SET = auto()      # Pas (Set / Overhead pass)
-    SPIKE = auto()    # Smaç (Attack / Spike)
-    BLOCK = auto()    # Blok
-    DIVE = auto()     # Plonjon / Dive
+    BUMP = auto()         # Bump / Dig / Receive (L-CTRL or Bump)
+    SET = auto()          # Overhead Set / Pass (RMB)
+    SPIKE = auto()        # Spike Attack / Power Serve (LMB in air)
+    DUMP = auto()         # Dump / Soft Tip (E in air)
+    SETTER_DUMP = auto()  # Setter Dump Surprise Attack (RMB + E grounded)
+    ROLL_DIG = auto()     # Acrobatic Diving Roll Dig (L-CTRL + RMB, 5s CD)
+    AIR_BAILOUT = auto()  # Emergency Mid-Air Tap/Bailout (L-CTRL + LMB in air)
+    BLOCK = auto()        # Net Block
+    DIVE = auto()         # Dive
     CELEBRATE = auto()
     DISAPPOINT = auto()
+
+class TimingRating(Enum):
+    GREEN = "PERFECT!"    # Flawless timing
+    YELLOW = "GOOD"       # Standard timing
+    RED = "OFF-TIME"      # Mistimed / Mismit
+
+ROLL_DIG_COOLDOWN = 5.0
+
+# Supported Screen Resolutions
+RESOLUTIONS = [
+    (1280, 720, "1280x720 (HD)"),
+    (1600, 900, "1600x900 (HD+)"),
+    (1920, 1080, "1920x1080 (FHD)")
+]
 
 class GameMode(Enum):
     TEAM_3V3 = "3 vs 3 (Full Team Match)"
@@ -83,3 +101,4 @@ class AIDifficulty(Enum):
     EASY = "Easy (Casual)"
     MEDIUM = "Normal (Arcade)"
     HARD = "Hard (Challenger)"
+

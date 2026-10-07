@@ -45,6 +45,12 @@ class Ball:
         self.predict_z = z
         self.time_to_impact = 0.0
 
+        # Special shot types & trails
+        self.is_float = False
+        self.is_spike = False
+        self.flight_time = 0.0
+        self.trail = []  # List of (Vector3, color, alpha)
+
     def reset(self, x=0.0, y=2.0, z=-7.5, team=None):
         self.x = x
         self.y = y
@@ -59,6 +65,10 @@ class Ball:
         self.bounce_count = 0
         self.in_air = True
         self.net_touched = False
+        self.is_float = False
+        self.is_spike = False
+        self.flight_time = 0.0
+        self.trail.clear()
         self.update_prediction()
 
     def update(self, dt, audio_mgr=None):
@@ -66,10 +76,26 @@ class Ball:
         if not self.in_air:
             return
 
-        # 1. Apply gravity and air drag
+        self.flight_time += dt
+
+        # 1. Apply gravity, air drag, and special Float Serve Knuckleball physics
         self.vy += GRAVITY * dt
         self.vx *= (BALL_AIR_DRAG ** (dt * 60.0))
         self.vz *= (BALL_AIR_DRAG ** (dt * 60.0))
+
+        # Float Knuckleball Effect: erratic horizontal drift and sharp dip near the net!
+        if self.is_float:
+            # Knuckleball air-wobble
+            wobble_x = math.sin(self.flight_time * 16.0) * 1.6
+            self.x += wobble_x * dt
+            # Sudden aerodynamic dive when crossing net plane
+            if abs(self.z) < 2.2 and self.y > NET_HEIGHT - 0.2:
+                self.vy -= 10.0 * dt
+
+        # Record trail points for high-energy visual feedback
+        if len(self.trail) > 16:
+            self.trail.pop(0)
+        self.trail.append((self.x, self.y, self.z, self.is_spike, self.is_float))
 
         # 2. Check Net Collision (Z = 0 plane)
         prev_z = self.z
@@ -85,6 +111,7 @@ class Ball:
                     self.vx *= 0.5
                     self.vy *= 0.7
                     self.net_touched = True
+                    self.is_float = False
                     if audio_mgr:
                         audio_mgr.play("hit_bump")
 
@@ -93,14 +120,17 @@ class Ball:
         self.y += self.vy * dt
         self.z += self.vz * dt
 
-        # Visual spin
-        speed = math.sqrt(self.vx * self.vx + self.vz * self.vz + self.vy * self.vy)
-        self.rot_x += speed * 5.0 * dt
-        self.rot_y += self.vx * 4.0 * dt
+        # Visual spin (float serves do NOT spin: true knuckleball!)
+        if not self.is_float:
+            speed = math.sqrt(self.vx * self.vx + self.vz * self.vz + self.vy * self.vy)
+            self.rot_x += speed * 5.0 * dt
+            self.rot_y += self.vx * 4.0 * dt
 
         # 4. Floor Collision (Y = BALL_RADIUS)
         if self.y <= BALL_RADIUS:
             self.y = BALL_RADIUS
+            self.is_float = False
+            self.is_spike = False
             if not self.has_bounced:
                 self.has_bounced = True
                 self.bounce_count = 1
@@ -125,8 +155,6 @@ class Ball:
 
     def update_prediction(self):
         """Solves quadratic trajectory equation for ground impact point (y = BALL_RADIUS)."""
-        # y(t) = y0 + vy*t + 0.5*g*t^2 = BALL_RADIUS
-        # a*t^2 + b*t + c = 0
         a = 0.5 * GRAVITY
         b = self.vy
         c = self.y - BALL_RADIUS
@@ -146,7 +174,7 @@ class Ball:
         self.predict_x = self.x
         self.predict_z = self.z
 
-    def launch_arc(self, target_x, target_z, peak_height=3.8, is_spike=False, spike_speed=20.0):
+    def launch_arc(self, target_x, target_z, peak_height=3.8, is_spike=False, is_float=False, spike_speed=22.0):
         """
         Calculates exact initial velocity vector (vx, vy, vz)
         to arc from current position to (target_x, target_z).
@@ -154,6 +182,10 @@ class Ball:
         self.has_bounced = False
         self.in_air = True
         self.net_touched = False
+        self.is_spike = is_spike
+        self.is_float = is_float
+        self.flight_time = 0.0
+        self.trail.clear()
 
         dx = target_x - self.x
         dz = target_z - self.z
@@ -162,16 +194,24 @@ class Ball:
         if is_spike:
             # Direct downward hammer shot
             dy = BALL_RADIUS - self.y
-            flight_time = max(0.28, horiz_dist / spike_speed)
+            flight_time = max(0.26, horiz_dist / spike_speed)
             self.vx = dx / flight_time
             self.vz = dz / flight_time
-            # vy = (dy - 0.5 * g * t^2) / t
             self.vy = (dy - 0.5 * GRAVITY * (flight_time ** 2)) / flight_time
+        elif is_float:
+            # Knuckleball Float Serve: fast, flat, skimming right over net height
+            h = max(NET_HEIGHT + 0.35, max(self.y + 0.2, peak_height * 0.88))
+            vy0 = math.sqrt(2 * abs(GRAVITY) * (h - self.y))
+            time_up = vy0 / abs(GRAVITY)
+            time_down = math.sqrt(2 * abs(GRAVITY) * (h - BALL_RADIUS)) / abs(GRAVITY)
+            total_time = max(0.45, (time_up + time_down) * 0.85)
+
+            self.vx = dx / total_time
+            self.vz = dz / total_time
+            self.vy = vy0
         else:
             # Upward parabolic arc
-            # Ensure peak_height is higher than current y
             h = max(self.y + 0.5, peak_height)
-            # Time to peak: vy0 = sqrt(2 * |g| * (h - y0))
             vy0 = math.sqrt(2 * abs(GRAVITY) * (h - self.y))
             time_up = vy0 / abs(GRAVITY)
             time_down = math.sqrt(2 * abs(GRAVITY) * (h - BALL_RADIUS)) / abs(GRAVITY)
@@ -184,7 +224,20 @@ class Ball:
         self.update_prediction()
 
     def draw(self):
-        """Renders the 3D volleyball, ground shadow, and landing target ring."""
+        """Renders the 3D volleyball, dynamic trails, ground shadow, and landing target ring."""
+        # 0. High-Energy Particle Trails
+        if self.in_air and len(self.trail) > 1:
+            for idx, pt in enumerate(self.trail):
+                tx, ty, tz, was_spike, was_float = pt
+                prog = idx / len(self.trail)
+                rad = BALL_RADIUS * 0.45 * prog
+                if was_spike:
+                    col = pr.Color(255, int(80 + 140 * prog), 30, int(180 * prog))
+                    pr.draw_sphere(pr.Vector3(tx, ty, tz), rad, col)
+                elif was_float:
+                    col = pr.Color(40, 220, 255, int(170 * prog))
+                    pr.draw_sphere(pr.Vector3(tx, ty, tz), rad, col)
+
         # 1. Ground Shadow (Directly beneath ball)
         shadow_scale = max(0.15, 1.0 - (self.y / 8.0) * 0.6)
         shadow_rad = BALL_RADIUS * 1.4 * shadow_scale
@@ -227,11 +280,9 @@ class Ball:
 
         # 3. 3D Volleyball Sphere
         pos = pr.Vector3(self.x, self.y, self.z)
-        # Base white sphere
         pr.draw_sphere(pos, BALL_RADIUS, COLOR_BALL_WHITE)
         
         # Low-poly stylized swirl panels (Blue & Yellow bands)
-        # Top/bottom stripe accents
         band_offset_y = BALL_RADIUS * 0.35 * math.cos(self.rot_x)
         band_offset_x = BALL_RADIUS * 0.35 * math.sin(self.rot_y)
         pr.draw_sphere(
@@ -244,3 +295,7 @@ class Ball:
             BALL_RADIUS * 0.5,
             COLOR_BALL_YELLOW
         )
+
+        # Knuckleball Float shimmer halo
+        if self.is_float and self.in_air:
+            pr.draw_sphere(pos, BALL_RADIUS * 1.25, pr.Color(60, 220, 255, 80))
