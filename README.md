@@ -1,89 +1,67 @@
-# 🏐 FlyHigh! - 3D Arcade Volleyball Game
+# 🏐 FlyHigh! - 3D Arcade Volleyball Game (3v3 Edition)
 
-**FlyHigh!**, popüler arcade voleybol oyunu *"Just Volleyball"* tarzında tasarlanmış; sade, akıcı ve yüksek tempolu bir 3D voleybol oyunudur.
+**FlyHigh!**, modern arcade anime voleybol tarzında tasarlanmış; dinamik, akıcı ve yüksek tempolu bir 3D voleybol oyunudur.
 
 Hem **klavye/fare** hem de **joystick / gamepad (Xbox, PlayStation, Logitech vb.)** ile sorunsuz oynanabilir. Modüler Python & Raylib mimarisi sayesinde ultra-komplike olmadan her türlü yeni mekaniğe ve geliştirmeye esneklik sağlar. Tek bir komut veya `.bat` dosyası ile bağımsız Windows `.exe` dosyası olarak paketlenebilir.
 
 ---
 
-## 🌟 Öne Çıkan Özellikler
+## 🌟 Yeni ve Öne Çıkan Özellikler (v1.2 Güncellemesi)
 
-1. **"Just Volleyball" Tarzı Düşük Poligonlu (Low-Poly) 3D Tasarım:**
-   - Uluslararası standartlarda nizami saha (18m x 9m), file, antenler ve seyirci tribünleri.
-   - Prosedürel animasyonlu 3D karakterler (Koşma, manşet pozisyonu, pas kaldırma, smaç vuruşu, plonjon, kutlama).
-2. **Derinlik Algısı ve İniş Göstergesi (Landing Reticle):**
-   - 3D voleybol oyunlarında topun düşeceği yeri kestirebilmek için topun tam altına düşen zemin gölgesi ve iniş anına doğru küçülen **tahmini iniş hedef halkası** (Arcade Prediction Ring).
-3. **Gerçek Voleybol Rallisi & 3 Vuruş Kuralı:**
-   - **Servis:** Topu havaya atma (Toss) ve ardından smaç veya plase servis ile karşı sahaya gönderme.
-   - **Manşet (Bump / Dig):** Gelen topu yumuşatarak pasör bölgesine kaldırma.
-   - **Pas (Set):** Smaçörün vurması için file üzerine yükseltme.
-   - **Smaç (Spike / Attack):** Havada sıçrayıp rakip sahanın boş köşesine sert hücum vurma.
-   - **Plonjon (Dive):** Yere yakın topları kurtarmak için öne doğru kayma.
-   - 3 vuruş sınırlaması, file teması, aut / çizgi içi kontrolleri ve otomatik skor hakemi.
-4. **Çift Kontrol Desteği (Klavye & Joystick / Gamepad):**
-   - Gamepad veya klavyeye dokunulduğunda anında algılama ve arayüz tuş ipuçlarını dinamik güncelleme.
-   - Gamepad titreşim (rumble) desteği (Smaçlarda ve sayılarda hissedilir geri bildirim).
-5. **Dinamik 3D Kamera:**
-   - Oyuncu arkasından dinamik takip kamerası, TV canlı yayın yan saha kamerası ve yüksek taktik kamera modları (`TAB` veya Gamepad `BACK` tuşu ile geçiş).
-6. **Sıfır Harici Dosya Bağımlılığı ile Ses Motoru:**
-   - Hakem düdüğü, sert smaç çarpması, manşet sesi, zemin sekmesi ve taraftar tezahüratları prosedürel olarak Python standard kütüphanesiyle otomatik sentezlenir.
+1. **3v3 Takım Maçları:**
+   - 1v1 yerine gerçekçi **3 vs 3** takım formatı:
+     - **Takımımız (3 Kişi):** Kaptan (Siz / #5), Pasör (AI Teammate #2), Smaçör/Blokör (AI Teammate #4).
+     - **Rakip Takım (3 Kişi):** Smaçör Kaptan (#1), Pasör (#3), Libero/Defans (#6).
+   - **Oyuncu Önceliği Kuralı (Player Priority):** Top size yakın düştüğünde takım arkadaşlarınız topu çalmaz, sizin manşet/pas/smaç vurmanız için alan açar!
+2. **Modern Anime Chibi Karakter Tasarımı:**
+   - Kutu/dikdörtgen modeller yerine; gümüş/beyaz dikenli anime saçlı, badem gözlü, sevimli yüz hatlarına sahip şık sporcu modeli.
+   - **Yüzen Küresel Eller (Chibi Arcade Style):** Manşette birbirine kenetlenen, pas kaldırırken baş üstünde toplanan, smaç anında ateşlenen dinamik küre eller.
+   - Beyaz kolsuz voleybol forması (#5 numara), turkuaz şort, siyah dizlikler ve mor boğazlı lacivert spor ayakkabılar.
+3. **Tatlı ve Modern Arcade Ana Menü:**
+   - Arkada dönen 3D stadyum kamerası, dinamik buton vurguları (hover), zorluk ayarı (Kolay / Normal / Zor), tuş rehberi modal penceresi ve ses açma/kapama.
+4. **Düzeltilmiş ve Akıcı Yön Kontrolleri:**
+   - `D` tuşu ve sağ analog çubuk artık ekranda doğrudan **SAĞA**, `A` tuşu ve sol analog çubuk doğrudan **SOLA** hareket eder.
+5. **Arcade Vuruş Bildirimleri & Titreşim:**
+   - Başarılı manşette `"NICE DIG!"`, pasa kalkınca `"PERFECT SET!"`, sert smaçta `"BOOM SPIKE!!"` dinamik görsel popupları ve Gamepad titreşim (rumble) desteği.
+6. **Derinlik Algısı ve İniş Göstergesi (Landing Reticle):**
+   - 3D sahada topun düşeceği yeri tam kestirebilmek için zeminde dinamik gölge ve iniş anına doğru daralan hedef halkası.
 7. **Tek Tıkla `.exe` Derleme:**
-   - PyInstaller ile tüm bağımlılıklar paketlenmiş `FlyHigh_Volleyball.exe` üretilir.
+   - `build_exe.bat` ile bağımsız `FlyHigh_Volleyball.exe` üretilir.
 
 ---
 
 ## 🎮 Kontroller (Controls)
 
-| Aksiyon | Klavye & Fare | Gamepad / Joystick (Xbox / PS) |
+| Aksiyon | Klavye & Fare | Joystick / Gamepad (Xbox / PS) |
 | :--- | :--- | :--- |
-| **Hareket** | `W`, `A`, `S`, `D` veya Yön Tuşları | **Sol Analog Çubuk** / D-Pad |
+| **Sağa Git** | `D` / Sağ Ok Tuşu | **Sol Analog Sağa** / D-Pad Sağ |
+| **Sola Git** | `A` / Sol Ok Tuşu | **Sol Analog Sola** / D-Pad Sol |
+| **İleri Git (Fileye)** | `W` / Yukarı Ok | **Sol Analog Yukarı** / D-Pad Yukarı |
+| **Geri Çekil** | `S` / Aşağı Ok | **Sol Analog Aşağı** / D-Pad Aşağı |
 | **Hedef Alma (Nişan)** | Yön Tuşları / Mouse | **Sağ Analog Çubuk** |
 | **Sıçrama / Smaç** | `Boşluk (SPACE)` | **(A)** / Çarpı (Cross) |
-| **Servis Atışı (Toss)** | `Boşluk (SPACE)` veya `J` | **(A)** veya **(X)** |
-| **Manşet (Karşılama)** | `J` / Fare Sol Tık / `Z` | **(X)** / Kare (Square) |
-| **Pas (Havaya Kaldırma)** | `K` / Fare Sağ Tık / `X` | **(Y)** / Üçgen (Triangle) |
+| **Servis Fırlat (Toss)** | `Boşluk (SPACE)` veya `J` | **(A)** veya **(X)** |
+| **Manşet (1. Vuruş)** | `J` / Sol Tık / `Z` | **(X)** / Kare (Square) |
+| **Pas (2. Vuruş)** | `K` / Sağ Tık / `X` | **(Y)** / Üçgen (Triangle) |
 | **Smaç Vuruşu (Havada)** | `Boşluk (SPACE)` veya `L` | **(A)** veya **(B)** |
 | **Plonjon (Kurtarma)** | `Sol Shift` veya `C` | **(RB)** / R1 veya **(B)** |
 | **Kamera Değiştirme** | `TAB` veya `V` | **(VIEW / BACK)** |
-| **Duraklatma (Pause)** | `ESC` veya `P` | **(START / MENU)** |
+| **Menü / Duraklatma** | `ESC` veya `P` | **(START / MENU)** |
 
 ---
 
-## 🚀 Hızlı Başlangıç
+## 🚀 Çalıştırma Yöntemleri
 
-### 1. Python ile Doğrudan Çalıştırma
-Projeyi indirdikten sonra klasör içinde:
+### 1. Hazır `.exe` Dosyasını Başlatma
+Doğrudan derlenmiş bağımsız yürütülebilir dosyaya çift tıklayabilirsiniz:
+📁 `dist\FlyHigh_Volleyball\FlyHigh_Volleyball.exe`
+
+### 2. Python ile Çalıştırma
+Klasör içindeki **`run_game.bat`** dosyasına çift tıklayabilir veya terminalden:
 ```bash
-# Bağımlılıkları yükleyin
-python -m pip install -r requirements.txt
-
-# Oyunu başlatın
 python main.py
 ```
-*(veya doğrudan **`run_game.bat`** dosyasına çift tıklayın).*
 
----
-
-### 2. Bağımsız `.exe` Oluşturma
-Herhangi bir Python kurulumuna ihtiyaç duymadan arkadaşlarınızla paylaşabileceğiniz `.exe` oluşturmak için:
-
-1. **`build_exe.bat`** dosyasına çift tıklayın.
-2. Derleme tamamlandığında dosyanız hazır olacaktır:
-   ```
-   dist\FlyHigh_Volleyball\FlyHigh_Volleyball.exe
-   ```
-
----
-
-## 🛠️ Mimari ve Esneklik (Kod Özelleştirme)
-
-Kod yapısı sade ve modüler tutulmuştur. İhtiyacınıza göre kolayca değiştirebilirsiniz:
-
-- `constants.py`: Saha ölçüleri, yerçekimi ivmesi (`GRAVITY`), oyuncu hızı (`PLAYER_SPEED`), renkler ve puan hedefleri.
-- `ball.py`: Top fiziği, zıplama katsayısı, yere düşme tahmin hesabı (`update_prediction`) ve file çarpışması.
-- `character.py`: 3D oyuncu modeli, uzuv parçaları, forma renkleri ve prosedürel koşma/smaç animasyonları.
-- `ai_controller.py`: Rakip bot zekası, tepki süreleri ve hücum taktikleri (Kolay, Orta, Zor seviyeleri).
-- `input_manager.py`: Klavye ve Gamepad girişlerinin haritalanması ve ölü bölge (deadzone) ayarları.
-- `court.py`: 3D salon ve voleybol sahası çizimleri.
-- `match_manager.py`: Sayı kazanma kuralları, servis rotasyonu ve ralli durumları.
-- `ui_renderer.py`: Skor tabelası, vuruş sayacı (1/3, 2/3, 3/3) ve durum bildirimleri.
+### 3. Yeni `.exe` Derleme
+Kod üzerinde değişiklik yaptıktan sonra yeni `.exe` üretmek için:
+- **`build_exe.bat`** dosyasına çift tıklamanız yeterlidir.
