@@ -75,8 +75,8 @@ class PlayerAction(Enum):
     DISAPPOINT = auto()
 
 class GameMode(Enum):
+    TEAM_3V3 = "3 vs 3 (Full Team Match)"
     SOLO_1V1 = "1 vs 1 (Solo Match)"
-    TEAM_2V2 = "2 vs 2 (Team Match)"
     PRACTICE = "Free Practice"
 
 class AIDifficulty(Enum):

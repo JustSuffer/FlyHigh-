@@ -42,14 +42,16 @@ class InputManager:
         gp_move_z = 0.0
         
         # --- Keyboard Movement ---
+        # Screen perspective: D is Right, A is Left.
+        # In court world coordinates from camera view: World -X is Screen Right, World +X is Screen Left.
         if pr.is_key_down(pr.KEY_W) or pr.is_key_down(pr.KEY_UP):
-            kb_move_z += 1.0
+            kb_move_z += 1.0  # Towards net (+Z)
         if pr.is_key_down(pr.KEY_S) or pr.is_key_down(pr.KEY_DOWN):
-            kb_move_z -= 1.0
-        if pr.is_key_down(pr.KEY_A) or pr.is_key_down(pr.KEY_LEFT):
-            kb_move_x += 1.0
+            kb_move_z -= 1.0  # Away from net (-Z)
         if pr.is_key_down(pr.KEY_D) or pr.is_key_down(pr.KEY_RIGHT):
-            kb_move_x -= 1.0
+            kb_move_x -= 1.0  # Screen Right -> World -X
+        if pr.is_key_down(pr.KEY_A) or pr.is_key_down(pr.KEY_LEFT):
+            kb_move_x += 1.0  # Screen Left  -> World +X
 
         kb_active = (kb_move_x != 0.0 or kb_move_z != 0.0 or
                      pr.is_key_pressed(pr.KEY_SPACE) or
@@ -69,11 +71,9 @@ class InputManager:
             raw_lx = pr.get_gamepad_axis_movement(self.gamepad_id, pr.GAMEPAD_AXIS_LEFT_X)
             raw_ly = pr.get_gamepad_axis_movement(self.gamepad_id, pr.GAMEPAD_AXIS_LEFT_Y)
             
-            # Invert X so Left is +X (toward left in screen perspective) or standard
-            # In our court: +X is right, -X is left.
-            # When camera looks from -Z towards +Z: Left on screen is -X, Right is +X.
+            # Left Stick: Right stick -> World -X (Screen Right)
             if abs(raw_lx) > self.DEADZONE:
-                gp_move_x = raw_lx
+                gp_move_x = -raw_lx
                 gp_active = True
             if abs(raw_ly) > self.DEADZONE:
                 gp_move_z = -raw_ly  # Up on stick is towards net (+Z)
@@ -87,17 +87,17 @@ class InputManager:
                 gp_move_z = -1.0
                 gp_active = True
             if pr.is_gamepad_button_down(self.gamepad_id, pr.GAMEPAD_BUTTON_LEFT_FACE_LEFT):
-                gp_move_x = -1.0
+                gp_move_x = 1.0   # Screen Left -> World +X
                 gp_active = True
             if pr.is_gamepad_button_down(self.gamepad_id, pr.GAMEPAD_BUTTON_LEFT_FACE_RIGHT):
-                gp_move_x = 1.0
+                gp_move_x = -1.0  # Screen Right -> World -X
                 gp_active = True
 
             # Right Stick for precise aiming
             raw_rx = pr.get_gamepad_axis_movement(self.gamepad_id, pr.GAMEPAD_AXIS_RIGHT_X)
             raw_ry = pr.get_gamepad_axis_movement(self.gamepad_id, pr.GAMEPAD_AXIS_RIGHT_Y)
             if abs(raw_rx) > self.DEADZONE or abs(raw_ry) > self.DEADZONE:
-                gp_aim_x = raw_rx
+                gp_aim_x = -raw_rx
                 gp_aim_z = -raw_ry
                 gp_active = True
 
@@ -129,8 +129,7 @@ class InputManager:
             self.aim_x = gp_aim_x if (gp_aim_x != 0 or gp_aim_z != 0) else gp_move_x
             self.aim_z = gp_aim_z if (gp_aim_x != 0 or gp_aim_z != 0) else gp_move_z
         else:
-            # On screen: D moves right (+X), A moves left (-X), W moves toward net (+Z), S moves back (-Z)
-            self.move_x = -kb_move_x
+            self.move_x = kb_move_x
             self.move_z = kb_move_z
             self.aim_x = self.move_x
             self.aim_z = self.move_z

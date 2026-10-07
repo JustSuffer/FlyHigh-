@@ -1,7 +1,13 @@
 """
 FlyHigh! - 3D Volleyball Game
-Stylized Low-Poly 3D Player Character
-Procedural animation, dynamic poses, jersey colors, and physics.
+Modern Arcade Anime Character (Inspired by 'Just Volleyball' & Anime Sports)
+Features:
+- Spiky geometric anime hair (silver/white for captain, customizable)
+- Expressive anime chibi face (almond eyes with pupils & highlights, eyebrows, nose, mouth)
+- Floating spherical hands (Rayman / Chibi arcade style with dynamic volleyball poses)
+- Athletic sleeveless jersey tank top with bold player numbers
+- Cyan volleyball shorts, black kneepads, cobalt sneakers with purple socks
+- Smooth procedural animations (Run, Jump, Bump, Set, Spike, Dive, Celebrate)
 """
 import pyray as pr
 import math
@@ -11,29 +17,14 @@ from constants import (
     Team, PlayerAction, GRAVITY
 )
 
-# Team Color Palettes
-PALETTE_PLAYER = {
-    "jersey": pr.Color(30, 110, 220, 255),    # Vibrant Royal Blue
-    "shorts": pr.Color(20, 30, 50, 255),      # Navy
-    "skin":   pr.Color(235, 190, 150, 255),   # Skin tone
-    "hair":   pr.Color(45, 30, 20, 255),      # Dark hair
-    "shoes":  pr.Color(245, 245, 245, 255),   # Clean white sneakers
-    "kneepad":pr.Color(30, 30, 35, 255),
-    "trim":   pr.Color(255, 215, 0, 255)      # Gold accents
-}
-
-PALETTE_OPPONENT = {
-    "jersey": pr.Color(220, 45, 45, 255),     # Crimson Red
-    "shorts": pr.Color(40, 20, 25, 255),      # Dark Maroon
-    "skin":   pr.Color(225, 180, 140, 255),
-    "hair":   pr.Color(35, 35, 40, 255),
-    "shoes":  pr.Color(245, 245, 245, 255),
-    "kneepad":pr.Color(30, 30, 35, 255),
-    "trim":   pr.Color(255, 255, 255, 255)
-}
+# Colors
+COLOR_SKIN = pr.Color(252, 218, 185, 255)       # Anime Peach Skin
+COLOR_SKIN_SHADOW = pr.Color(230, 190, 160, 255)
+COLOR_KNEEPAD = pr.Color(20, 22, 28, 255)        # Solid Black Kneepads
+COLOR_OUTLINE = pr.Color(18, 18, 24, 255)        # Toon Outline Dark
 
 class Character:
-    def __init__(self, x=0.0, z=-5.0, team=Team.PLAYER, jersey_num=7, is_ai=False):
+    def __init__(self, x=0.0, z=-5.0, team=Team.PLAYER, jersey_num=5, name="CAPTAIN", hair_color=None, is_ai=False):
         self.x = x
         self.y = 0.0
         self.z = z
@@ -43,18 +34,54 @@ class Character:
         
         self.team = team
         self.jersey_num = jersey_num
+        self.name = name
         self.is_ai = is_ai
-        self.palette = PALETTE_PLAYER if team == Team.PLAYER else PALETTE_OPPONENT
         
-        # Orientation (radians, 0 means facing +Z toward opponent court)
+        # Color Palettes (Photo-inspired: White jersey, Cyan shorts, Blue/Purple shoes)
+        if team == Team.PLAYER:
+            self.color_jersey = pr.Color(248, 250, 252, 255)    # White Tank Top
+            self.color_trim   = pr.Color(25, 28, 35, 255)        # Black Trim
+            self.color_shorts = pr.Color(35, 180, 245, 255)      # Cyan Blue Shorts
+            self.color_shoes  = pr.Color(25, 75, 225, 255)       # Royal Blue Sneakers
+            self.color_socks  = pr.Color(115, 55, 235, 255)      # Purple Ankle Cuffs
+            self.color_number = pr.Color(18, 20, 25, 255)       # Bold Black Digit
+            # Default hair: Silver/White for captain, or specific color
+            if hair_color is not None:
+                self.color_hair = hair_color
+            elif jersey_num == 5:
+                self.color_hair = pr.Color(238, 240, 245, 255)   # Silver/White Anime Spikes
+            elif jersey_num == 2:
+                self.color_hair = pr.Color(50, 40, 35, 255)      # Dark Chestnut Spikes
+            else:
+                self.color_hair = pr.Color(235, 190, 90, 255)    # Sandy Blonde Spikes
+        else:
+            # Opponent Team: Dark Crimson & Midnight aesthetic
+            self.color_jersey = pr.Color(30, 32, 40, 255)        # Dark Charcoal Jersey
+            self.color_trim   = pr.Color(235, 45, 65, 255)       # Red Trim
+            self.color_shorts = pr.Color(225, 40, 60, 255)       # Crimson Red Shorts
+            self.color_shoes  = pr.Color(20, 20, 25, 255)        # Dark Shoes
+            self.color_socks  = pr.Color(235, 45, 65, 255)       # Crimson Socks
+            self.color_number = pr.Color(255, 255, 255, 255)     # Crisp White Digit
+            if hair_color is not None:
+                self.color_hair = hair_color
+            elif jersey_num == 1:
+                self.color_hair = pr.Color(35, 35, 42, 255)      # Jet Black Spikes
+            elif jersey_num == 3:
+                self.color_hair = pr.Color(210, 215, 225, 255)   # Silver Spikes
+            else:
+                self.color_hair = pr.Color(180, 50, 45, 255)     # Crimson Spikes
+
+        # Facing angle (0 = facing +Z toward net, pi = facing -Z toward player net)
         self.facing_angle = 0.0 if team == Team.PLAYER else math.pi
         
-        # State & Animation
+        # Action & Animation
         self.action = PlayerAction.IDLE
         self.action_timer = 0.0
         self.is_grounded = True
         self.anim_time = 0.0
-        self.stamina = 1.0
+        
+        # Trail & Particle effects on spikes
+        self.spike_spark_timer = 0.0
 
     def reset_position(self, x, z):
         self.x = x
@@ -78,16 +105,19 @@ class Character:
     def trigger_action(self, action, duration=0.35):
         self.action = action
         self.action_timer = duration
+        if action == PlayerAction.SPIKE:
+            self.spike_spark_timer = 0.35
 
     def update(self, dt, move_dir_x=0.0, move_dir_z=0.0, look_target=None):
-        """Updates character physics, movement, and procedural animation timer."""
         self.anim_time += dt
 
-        # Update action timer
         if self.action_timer > 0.0:
             self.action_timer -= dt
             if self.action_timer <= 0.0 and self.is_grounded:
                 self.action = PlayerAction.IDLE
+
+        if self.spike_spark_timer > 0.0:
+            self.spike_spark_timer -= dt
 
         # Movement physics
         move_mag = math.sqrt(move_dir_x * move_dir_x + move_dir_z * move_dir_z)
@@ -98,12 +128,12 @@ class Character:
             if self.is_grounded and self.action in [PlayerAction.IDLE, PlayerAction.RUN]:
                 self.action = PlayerAction.RUN
         else:
-            self.vx *= 0.7
-            self.vz *= 0.7
+            self.vx *= 0.65
+            self.vz *= 0.65
             if self.is_grounded and self.action == PlayerAction.RUN:
                 self.action = PlayerAction.IDLE
 
-        # Vertical jumping / gravity physics
+        # Jumping physics
         if not self.is_grounded:
             self.vy += GRAVITY * dt
             self.y += self.vy * dt
@@ -114,24 +144,19 @@ class Character:
                 if self.action == PlayerAction.JUMP:
                     self.action = PlayerAction.IDLE
 
-        # Apply position
         self.x += self.vx * dt
         self.z += self.vz * dt
 
-        # Orientation / Facing direction
+        # Orientation / Facing
         if look_target is not None:
-            # Face specific 3D point (e.g. ball or opponent net)
             dx = look_target[0] - self.x
             dz = look_target[1] - self.z
-            if dx != 0 or dz != 0:
+            if (dx * dx + dz * dz) > 0.05:
                 self.facing_angle = math.atan2(dx, dz)
         elif move_mag > 0.1:
-            # Face movement direction
             self.facing_angle = math.atan2(move_dir_x, move_dir_z)
         else:
-            # Default face net (Z=0)
-            default_angle = 0.0 if self.team == Team.PLAYER else math.pi
-            self.facing_angle = default_angle
+            self.facing_angle = 0.0 if self.team == Team.PLAYER else math.pi
 
     def dist_to_ball(self, ball):
         dx = ball.x - self.x
@@ -139,137 +164,235 @@ class Character:
         dz = ball.z - self.z
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
-    def can_reach_ball(self, ball):
-        """Checks if ball is within hitting distance."""
-        horiz_dist = math.sqrt((ball.x - self.x) ** 2 + (ball.z - self.z) ** 2)
-        # Player hit reach: cylinder around player from ground up to hands
-        max_reach = PLAYER_SPIKE_REACH if not self.is_grounded else PLAYER_REACH_RADIUS
-        return horiz_dist <= max_reach and (ball.y >= self.y) and (ball.y <= self.y + 3.2)
-
     def draw(self):
-        """Renders 3D stylized low-poly player character with animation poses."""
+        """Renders the stylized arcade anime player character matching the reference image."""
         px, py, pz = self.x, self.y, self.z
         angle = self.facing_angle
-        p = self.palette
 
-        # 1. Ground Shadow (Oval under player feet)
-        pr.draw_circle_3d(
-            pr.Vector3(px, 0.02, pz),
-            PLAYER_RADIUS * 1.1,
-            pr.Vector3(1, 0, 0), 90.0,
-            pr.Color(20, 20, 25, 120)
-        )
-
-        # Direction offsets based on facing angle
+        # Orientation vectors
         forward_x = math.sin(angle)
         forward_z = math.cos(angle)
         right_x = math.cos(angle)
         right_z = -math.sin(angle)
 
-        # Procedural limb oscillation for running
-        run_cycle = math.sin(self.anim_time * 14.0) if self.action == PlayerAction.RUN else 0.0
-        leg_offset = run_cycle * 0.22
-
-        # 2. Shoes / Feet (Gym sneakers)
-        foot_y = py + 0.1
-        # Left foot
-        pr.draw_cube(
-            pr.Vector3(px - right_x * 0.18 + forward_x * leg_offset, foot_y, pz - right_z * 0.18 + forward_z * leg_offset),
-            0.16, 0.14, 0.32, p["shoes"]
-        )
-        # Right foot
-        pr.draw_cube(
-            pr.Vector3(px + right_x * 0.18 - forward_x * leg_offset, foot_y, pz + right_z * 0.18 - forward_z * leg_offset),
-            0.16, 0.14, 0.32, p["shoes"]
+        # 1. Ground Shadow (Smooth dark circle under player)
+        shadow_rad = PLAYER_RADIUS * (1.1 - min(0.4, (py / 3.0) * 0.4))
+        shadow_alpha = int(max(40, 140 - py * 30))
+        pr.draw_circle_3d(
+            pr.Vector3(px, 0.02, pz),
+            shadow_rad,
+            pr.Vector3(1, 0, 0), 90.0,
+            pr.Color(15, 18, 25, shadow_alpha)
         )
 
-        # 3. Legs & Kneepads
-        leg_mid_y = py + 0.42
-        pr.draw_cylinder(
-            pr.Vector3(px - right_x * 0.18 + forward_x * (leg_offset * 0.5), py + 0.15, pz - right_z * 0.18 + forward_z * (leg_offset * 0.5)),
-            0.08, 0.09, 0.5, 8, p["skin"]
+        # Procedural animation cycles
+        run_cycle = math.sin(self.anim_time * 15.0) if self.action == PlayerAction.RUN else 0.0
+        idle_bob  = math.sin(self.anim_time * 4.0) * 0.02 if self.action == PlayerAction.IDLE else 0.0
+        leg_swing = run_cycle * 0.22
+
+        base_y = py + idle_bob
+
+        # 2. SNEAKERS & SOCKS (Blue base, purple collar, white sole)
+        # Left Foot
+        lf_pos = pr.Vector3(
+            px - right_x * 0.16 + forward_x * leg_swing,
+            base_y + 0.1,
+            pz - right_z * 0.16 + forward_z * leg_swing
         )
-        pr.draw_cylinder(
-            pr.Vector3(px + right_x * 0.18 - forward_x * (leg_offset * 0.5), py + 0.15, pz + right_z * 0.18 - forward_z * (leg_offset * 0.5)),
-            0.08, 0.09, 0.5, 8, p["skin"]
-        )
-        # Kneepads
-        pr.draw_cylinder(
-            pr.Vector3(px - right_x * 0.18, py + 0.45, pz - right_z * 0.18),
-            0.11, 0.11, 0.18, 8, p["kneepad"]
-        )
-        pr.draw_cylinder(
-            pr.Vector3(px + right_x * 0.18, py + 0.45, pz + right_z * 0.18),
-            0.11, 0.11, 0.18, 8, p["kneepad"]
+        # Right Foot
+        rf_pos = pr.Vector3(
+            px + right_x * 0.16 - forward_x * leg_swing,
+            base_y + 0.1,
+            pz + right_z * 0.16 - forward_z * leg_swing
         )
 
-        # 4. Shorts (Navy / Dark)
-        shorts_y = py + 0.8
-        pr.draw_cylinder(
-            pr.Vector3(px, shorts_y, pz),
-            0.26, 0.28, 0.38, 10, p["shorts"]
-        )
+        # Shoe body (Rounded capsule / spheres)
+        pr.draw_sphere(lf_pos, 0.13, self.color_shoes)
+        pr.draw_sphere(rf_pos, 0.13, self.color_shoes)
+        # Front toe cap
+        pr.draw_sphere(pr.Vector3(lf_pos.x + forward_x * 0.08, base_y + 0.08, lf_pos.z + forward_z * 0.08), 0.11, self.color_shoes)
+        pr.draw_sphere(pr.Vector3(rf_pos.x + forward_x * 0.08, base_y + 0.08, rf_pos.z + forward_z * 0.08), 0.11, self.color_shoes)
+        # Purple socks cuff
+        pr.draw_cylinder(pr.Vector3(lf_pos.x, base_y + 0.14, lf_pos.z), 0.08, 0.08, 0.12, 8, self.color_socks)
+        pr.draw_cylinder(pr.Vector3(rf_pos.x, base_y + 0.14, rf_pos.z), 0.08, 0.08, 0.12, 8, self.color_socks)
 
-        # 5. Torso / Volleyball Jersey
-        torso_y = py + 1.25
-        pr.draw_cube(
-            pr.Vector3(px, torso_y, pz),
-            0.52, 0.65, 0.32, p["jersey"]
-        )
-        # Number back / front accent
-        pr.draw_cube(
-            pr.Vector3(px + forward_x * 0.17, torso_y + 0.05, pz + forward_z * 0.17),
-            0.18, 0.22, 0.02, p["trim"]
-        )
+        # 3. LEGS & KNEEPADS
+        knee_y = base_y + 0.42
+        # Calves (Peach skin)
+        pr.draw_cylinder(pr.Vector3(lf_pos.x, base_y + 0.22, lf_pos.z), 0.07, 0.08, 0.22, 8, COLOR_SKIN)
+        pr.draw_cylinder(pr.Vector3(rf_pos.x, base_y + 0.22, rf_pos.z), 0.07, 0.08, 0.22, 8, COLOR_SKIN)
 
-        # 6. Arms & Hands (Pose based on Action)
-        shoulder_y = py + 1.45
-        left_shoulder  = pr.Vector3(px - right_x * 0.32, shoulder_y, pz - right_z * 0.32)
-        right_shoulder = pr.Vector3(px + right_x * 0.32, shoulder_y, pz + right_z * 0.32)
+        # Black Kneepads (Chunky athletic wraps)
+        pr.draw_cylinder(pr.Vector3(lf_pos.x, knee_y, lf_pos.z), 0.11, 0.11, 0.16, 10, COLOR_KNEEPAD)
+        pr.draw_cylinder(pr.Vector3(rf_pos.x, knee_y, rf_pos.z), 0.11, 0.11, 0.16, 10, COLOR_KNEEPAD)
+
+        # Thighs (Peach skin up to shorts)
+        pr.draw_cylinder(pr.Vector3(lf_pos.x, knee_y + 0.14, lf_pos.z), 0.08, 0.10, 0.20, 8, COLOR_SKIN)
+        pr.draw_cylinder(pr.Vector3(rf_pos.x, knee_y + 0.14, rf_pos.z), 0.08, 0.10, 0.20, 8, COLOR_SKIN)
+
+        # 4. VOLLEYBALL SHORTS (Cyan / Bright Blue athletic shorts)
+        shorts_y = base_y + 0.72
+        pr.draw_cylinder(pr.Vector3(px, shorts_y, pz), 0.22, 0.25, 0.28, 12, self.color_shorts)
+        # Shorts leg cuffs
+        pr.draw_cylinder(pr.Vector3(px - right_x * 0.13, shorts_y - 0.06, pz - right_z * 0.13), 0.12, 0.12, 0.14, 10, self.color_shorts)
+        pr.draw_cylinder(pr.Vector3(px + right_x * 0.13, shorts_y - 0.06, pz + right_z * 0.13), 0.12, 0.12, 0.14, 10, self.color_shorts)
+
+        # 5. ATHLETIC SLEEVELESS TANK TOP (Contoured athletic waist, white jersey)
+        torso_y = base_y + 1.12
+        # Slimmer athletic waist
+        pr.draw_cylinder(pr.Vector3(px, base_y + 0.86, pz), 0.20, 0.23, 0.26, 12, self.color_jersey)
+        # Upper chest & shoulders
+        pr.draw_cylinder(pr.Vector3(px, base_y + 1.05, pz), 0.23, 0.25, 0.30, 12, self.color_jersey)
+        
+        # Black border trim along armholes and collar
+        pr.draw_cylinder(pr.Vector3(px, base_y + 1.32, pz), 0.14, 0.14, 0.04, 10, self.color_trim)
+
+        # JERSEY NUMBER (Rendered on chest)
+        num_pos = pr.Vector3(px + forward_x * 0.24, torso_y + 0.05, pz + forward_z * 0.24)
+        self._draw_digit(num_pos, forward_x, forward_z, right_x, right_z, self.jersey_num, self.color_number)
+
+        # 6. SLENDER NECK
+        neck_y = base_y + 1.36
+        pr.draw_cylinder(pr.Vector3(px, neck_y, pz), 0.08, 0.08, 0.14, 8, COLOR_SKIN)
+
+        # 7. CHIBI ROUND HEAD (Warm anime peach skin)
+        head_y = base_y + 1.62
+        head_pos = pr.Vector3(px, head_y, pz)
+        pr.draw_sphere(head_pos, 0.26, COLOR_SKIN)
+
+        # Chibi rounded ears on sides
+        pr.draw_sphere(pr.Vector3(px - right_x * 0.26, head_y - 0.02, pz - right_z * 0.26), 0.08, COLOR_SKIN)
+        pr.draw_sphere(pr.Vector3(px + right_x * 0.26, head_y - 0.02, pz + right_z * 0.26), 0.08, COLOR_SKIN)
+
+        # 8. EXPRESSIVE ANIME FACE (Eyes, eyebrows, nose, mouth)
+        face_fwd = 0.24
+        # Left Eye (Almond with dark iris & white highlight)
+        le_pos = pr.Vector3(px + forward_x * face_fwd - right_x * 0.08, head_y + 0.03, pz + forward_z * face_fwd - right_z * 0.08)
+        re_pos = pr.Vector3(px + forward_x * face_fwd + right_x * 0.08, head_y + 0.03, pz + forward_z * face_fwd + right_z * 0.08)
+        
+        # Sclera (White base)
+        pr.draw_sphere(le_pos, 0.05, pr.Color(255, 255, 255, 255))
+        pr.draw_sphere(re_pos, 0.05, pr.Color(255, 255, 255, 255))
+        # Black Iris / Pupil
+        pr.draw_sphere(pr.Vector3(le_pos.x + forward_x * 0.02, le_pos.y, le_pos.z + forward_z * 0.02), 0.035, pr.Color(20, 20, 25, 255))
+        pr.draw_sphere(pr.Vector3(re_pos.x + forward_x * 0.02, re_pos.y, re_pos.z + forward_z * 0.02), 0.035, pr.Color(20, 20, 25, 255))
+        # White anime sparkle highlight
+        pr.draw_sphere(pr.Vector3(le_pos.x + forward_x * 0.035 - right_x * 0.015, le_pos.y + 0.015, le_pos.z + forward_z * 0.035 - right_z * 0.015), 0.012, pr.Color(255, 255, 255, 255))
+        pr.draw_sphere(pr.Vector3(re_pos.x + forward_x * 0.035 - right_x * 0.015, re_pos.y + 0.015, re_pos.z + forward_z * 0.035 - right_z * 0.015), 0.012, pr.Color(255, 255, 255, 255))
+
+        # Eyebrows (Arched dark lines)
+        pr.draw_cube(pr.Vector3(le_pos.x, head_y + 0.10, le_pos.z), 0.08, 0.02, 0.02, COLOR_OUTLINE)
+        pr.draw_cube(pr.Vector3(re_pos.x, head_y + 0.10, re_pos.z), 0.08, 0.02, 0.02, COLOR_OUTLINE)
+
+        # Small nose dot
+        pr.draw_sphere(pr.Vector3(px + forward_x * (face_fwd + 0.01), head_y - 0.03, pz + forward_z * (face_fwd + 0.01)), 0.018, COLOR_SKIN_SHADOW)
+        # Focused mouth line
+        pr.draw_cube(pr.Vector3(px + forward_x * (face_fwd + 0.01), head_y - 0.09, pz + forward_z * (face_fwd + 0.01)), 0.07, 0.018, 0.02, pr.Color(50, 30, 25, 255))
+
+        # 9. SPIKY ANIME HAIR (Signature Silver/White Jagged Spikes from Reference Photo!)
+        # Back and base volume
+        pr.draw_sphere(pr.Vector3(px - forward_x * 0.05, head_y + 0.10, pz - forward_z * 0.05), 0.25, self.color_hair)
+
+        # Prominent Upward Spiky Tufts (Crown Horns)
+        # Center Peak Spike
+        pr.draw_cylinder(pr.Vector3(px + forward_x * 0.02, head_y + 0.14, pz + forward_z * 0.02), 0.14, 0.02, 0.26, 6, self.color_hair)
+        # Left Horn Spike (Angled up-left)
+        lh_x = px - right_x * 0.16 + forward_x * 0.04
+        lh_z = pz - right_z * 0.16 + forward_z * 0.04
+        pr.draw_cylinder(pr.Vector3(lh_x, head_y + 0.12, lh_z), 0.13, 0.02, 0.28, 6, self.color_hair)
+        # Right Horn Spike (Angled up-right)
+        rh_x = px + right_x * 0.16 + forward_x * 0.04
+        rh_z = pz + right_z * 0.16 + forward_z * 0.04
+        pr.draw_cylinder(pr.Vector3(rh_x, head_y + 0.12, rh_z), 0.13, 0.02, 0.28, 6, self.color_hair)
+        # Side Cheek Bangs (Framing the face)
+        pr.draw_cylinder(pr.Vector3(px - right_x * 0.22, head_y + 0.02, pz - right_z * 0.22), 0.09, 0.02, 0.18, 5, self.color_hair)
+        pr.draw_cylinder(pr.Vector3(px + right_x * 0.22, head_y + 0.02, pz + right_z * 0.22), 0.09, 0.02, 0.18, 5, self.color_hair)
+        # Forehead Bang Tufts
+        pr.draw_cylinder(pr.Vector3(px + forward_x * 0.18, head_y + 0.16, pz + forward_z * 0.18), 0.08, 0.02, 0.12, 5, self.color_hair)
+
+        # 10. FLOATING SPHERICAL HANDS (Rayman / Chibi style, exactly as in reference photo!)
+        # Dynamic hand positions based on action
+        hand_rad = 0.135
+        arm_bob = math.sin(self.anim_time * 15.0) * 0.12 if self.action == PlayerAction.RUN else idle_bob * 2.0
 
         if self.action == PlayerAction.BUMP:
-            # Bump / Manşet: Both arms clasped straight in front, angled up at 45 deg
-            hands_pos = pr.Vector3(px + forward_x * 0.45, shoulder_y - 0.25, pz + forward_z * 0.45)
-            pr.draw_cylinder(left_shoulder, 0.07, 0.07, 0.45, 6, p["skin"])
-            pr.draw_cylinder(right_shoulder, 0.07, 0.07, 0.45, 6, p["skin"])
-            pr.draw_sphere(hands_pos, 0.12, p["skin"])
-        elif self.action == PlayerAction.SET:
-            # Set / Pas: Hands raised high above forehead
-            hands_pos = pr.Vector3(px + forward_x * 0.2, shoulder_y + 0.55, pz + forward_z * 0.2)
-            pr.draw_cylinder(left_shoulder, 0.07, 0.07, 0.5, 6, p["skin"])
-            pr.draw_cylinder(right_shoulder, 0.07, 0.07, 0.5, 6, p["skin"])
-            pr.draw_sphere(hands_pos, 0.14, p["skin"])
-        elif self.action == PlayerAction.SPIKE:
-            # Spike / Smaç: Dominant right arm extended high and forward, left arm for balance
-            spike_hand = pr.Vector3(px + right_x * 0.2 + forward_x * 0.45, shoulder_y + 0.75, pz + right_z * 0.2 + forward_z * 0.45)
-            pr.draw_cylinder(right_shoulder, 0.07, 0.08, 0.65, 6, p["skin"])
-            pr.draw_sphere(spike_hand, 0.14, p["skin"])
-            # Left arm back
-            pr.draw_cylinder(left_shoulder, 0.07, 0.07, 0.45, 6, p["skin"])
-        elif self.action == PlayerAction.CELEBRATE:
-            # Celebrate: Both hands raised in victory \o/
-            pr.draw_cylinder(left_shoulder, 0.07, 0.07, 0.6, 6, p["skin"])
-            pr.draw_cylinder(right_shoulder, 0.07, 0.07, 0.6, 6, p["skin"])
-            pr.draw_sphere(pr.Vector3(left_shoulder.x, shoulder_y + 0.6, left_shoulder.z), 0.12, p["skin"])
-            pr.draw_sphere(pr.Vector3(right_shoulder.x, shoulder_y + 0.6, right_shoulder.z), 0.12, p["skin"])
-        else:
-            # Normal Running / Idle arms
-            arm_swing = run_cycle * 0.3
-            pr.draw_cylinder(
-                pr.Vector3(left_shoulder.x - forward_x * arm_swing, shoulder_y - 0.2, left_shoulder.z - forward_z * arm_swing),
-                0.07, 0.07, 0.45, 6, p["skin"]
-            )
-            pr.draw_cylinder(
-                pr.Vector3(right_shoulder.x + forward_x * arm_swing, shoulder_y - 0.2, right_shoulder.z + forward_z * arm_swing),
-                0.07, 0.07, 0.45, 6, p["skin"]
-            )
+            # Bump (Manşet): Both spheres snapped together directly in front of the waist/chest
+            h1 = pr.Vector3(px + forward_x * 0.42 - right_x * 0.08, base_y + 0.88, pz + forward_z * 0.42 - right_z * 0.08)
+            h2 = pr.Vector3(px + forward_x * 0.42 + right_x * 0.08, base_y + 0.88, pz + forward_z * 0.42 + right_z * 0.08)
+            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+            # Energy link between hands
+            pr.draw_cylinder(h1, 0.08, 0.08, 0.16, 6, pr.Color(255, 230, 180, 200))
 
-        # 7. Head & Hair
-        head_y = py + 1.72
-        head_pos = pr.Vector3(px, head_y, pz)
-        pr.draw_sphere(head_pos, 0.22, p["skin"])
-        
-        # Hair / Cap (low-poly dome)
-        pr.draw_sphere(pr.Vector3(px, head_y + 0.08, pz - forward_z * 0.05), 0.21, p["hair"])
-        # Headband accent
-        pr.draw_cylinder(pr.Vector3(px, head_y + 0.02, pz), 0.23, 0.23, 0.06, 10, p["trim"])
+        elif self.action == PlayerAction.SET:
+            # Set (Pas): Both spheres raised high above forehead
+            h1 = pr.Vector3(px + forward_x * 0.18 - right_x * 0.20, head_y + 0.28, pz + forward_z * 0.18 - right_z * 0.20)
+            h2 = pr.Vector3(px + forward_x * 0.18 + right_x * 0.20, head_y + 0.28, pz + forward_z * 0.18 + right_z * 0.20)
+            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+
+        elif self.action == PlayerAction.SPIKE:
+            # Spike (Smaç): Hitting hand surged forward high, other hand balancing
+            spike_hand = pr.Vector3(px + forward_x * 0.55 + right_x * 0.24, head_y + 0.35, pz + forward_z * 0.55 + right_z * 0.24)
+            off_hand   = pr.Vector3(px - forward_x * 0.15 - right_x * 0.32, base_y + 1.10, pz - forward_z * 0.15 - right_z * 0.32)
+            pr.draw_sphere(spike_hand, hand_rad * 1.15, COLOR_SKIN)
+            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+
+            # Arcade burst aura on power spike hand!
+            if self.spike_spark_timer > 0.0:
+                pr.draw_sphere(spike_hand, hand_rad * 1.5, pr.Color(255, 215, 0, 140))
+                pr.draw_sphere(spike_hand, hand_rad * 2.0, pr.Color(255, 100, 30, 80))
+
+        elif self.action == PlayerAction.CELEBRATE:
+            # Celebrate: Hands held high in victory \o/
+            h1 = pr.Vector3(px - right_x * 0.36, head_y + 0.32, pz - right_z * 0.36)
+            h2 = pr.Vector3(px + right_x * 0.36, head_y + 0.32, pz + right_z * 0.36)
+            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+
+        else:
+            # Idle & Running: Spheres float playfully beside the hips
+            h1 = pr.Vector3(px - right_x * 0.38 + forward_x * arm_bob, base_y + 0.95 - arm_bob, pz - right_z * 0.38 + forward_z * arm_bob)
+            h2 = pr.Vector3(px + right_x * 0.38 - forward_x * arm_bob, base_y + 0.95 + arm_bob, pz + right_z * 0.38 - forward_z * arm_bob)
+            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
+            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+
+    def _draw_digit(self, pos, fwd_x, fwd_z, rt_x, rt_z, digit, col):
+        """Draws athletic jersey number in bold 3D geometry on chest."""
+        d_scale = 0.035
+        # Digits 1-9 simplified geometric glyphs
+        if digit == 5:
+            # Top bar
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.08, pos.z), 0.12, 0.03, 0.02, col)
+            # Left upper stem
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.045, pos.y + 0.045, pos.z - rt_z * 0.045), 0.03, 0.05, 0.02, col)
+            # Mid bar
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.01, pos.z), 0.11, 0.028, 0.02, col)
+            # Right lower stem
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.045, pos.y - 0.035, pos.z + rt_z * 0.045), 0.03, 0.06, 0.02, col)
+            # Bottom bar
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.07, pos.z), 0.12, 0.03, 0.02, col)
+        elif digit == 1:
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.04, 0.16, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.08, pos.z), 0.10, 0.03, 0.02, col)
+        elif digit == 2:
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.07, pos.z), 0.12, 0.03, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.045, pos.y + 0.035, pos.z + rt_z * 0.045), 0.03, 0.05, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.11, 0.028, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.045, pos.y - 0.035, pos.z - rt_z * 0.045), 0.03, 0.05, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.07, pos.z), 0.12, 0.03, 0.02, col)
+        elif digit == 3:
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.07, pos.z), 0.12, 0.03, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.045, pos.y, pos.z + rt_z * 0.045), 0.03, 0.16, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.10, 0.028, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.07, pos.z), 0.12, 0.03, 0.02, col)
+        elif digit == 4:
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.045, pos.y + 0.03, pos.z - rt_z * 0.045), 0.03, 0.09, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.11, 0.03, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.045, pos.y, pos.z + rt_z * 0.045), 0.03, 0.16, 0.02, col)
+        else: # 6 or default
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.07, pos.z), 0.12, 0.03, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.045, pos.y, pos.z - rt_z * 0.045), 0.03, 0.16, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.11, 0.028, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.045, pos.y - 0.035, pos.z + rt_z * 0.045), 0.03, 0.06, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.07, pos.z), 0.12, 0.03, 0.02, col)

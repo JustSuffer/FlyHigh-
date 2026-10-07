@@ -14,7 +14,7 @@ class MatchManager:
         self.points_to_win = points_to_win
         
         # State
-        self.state = MatchState.SERVE_READY
+        self.state = MatchState.TITLE_SCREEN
         self.serving_team = Team.PLAYER
         self.serving_player = None
         
