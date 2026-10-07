@@ -273,6 +273,7 @@ class InputManager:
         if self.active_device == "GAMEPAD":
             prompts = {
                 "JUMP": "(A)",
+                "TOSS": "(Y)",
                 "RECEIVE": "(LT) / (X)",
                 "PASS": "(Y)",
                 "SPIKE": "(A) / (B)",
@@ -287,6 +288,7 @@ class InputManager:
         else:
             prompts = {
                 "JUMP": "[SPACE]",
+                "TOSS": "[R-CLICK]",
                 "RECEIVE": "[L-CTRL]",
                 "PASS": "[R-CLICK]",
                 "SPIKE": "[L-CLICK]",

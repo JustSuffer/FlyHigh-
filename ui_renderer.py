@@ -1,9 +1,9 @@
 """
 FlyHigh! - 3D Volleyball Game
-Modern Arcade UI & HUD Renderer (100% English & Authentic Volleyball Terminology)
+Modern Arcade UI & HUD Renderer (100% Smooth Anti-Aliased Vector Fonts & Clean English)
 Features:
+- High-resolution Segoe UI vector font rendering (zero blocky/pixelated text!)
 - Pixel-perfect mouse hover and click detection on menu buttons
-- 100% clean ASCII text formatting (zero '?' character glyph bugs)
 - Full Settings Menu (Master Volume, Sound FX, Fullscreen, Resolution, Camera)
 - NBA 2K-Style Shot Timing Meter (Green / Yellow / Red contact windows)
 - Roll Dig 5-second cooldown indicator badge
@@ -12,13 +12,25 @@ Features:
 """
 import pyray as pr
 import math
+import os
+import sys
 from constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT, Team, MatchState, AIDifficulty,
     TimingRating, ROLL_DIG_COOLDOWN, RESOLUTIONS
 )
 
+def get_asset_path(subpath):
+    if getattr(sys, 'frozen', False):
+        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        p = os.path.join(base_dir, subpath)
+        if os.path.exists(p):
+            return p
+        return os.path.join(os.path.dirname(sys.executable), subpath)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_dir, subpath)
+
 # Modern Arcade Color Palette
-COLOR_GLASS_BG      = pr.Color(16, 20, 30, 235)
+COLOR_GLASS_BG      = pr.Color(16, 20, 30, 240)
 COLOR_GLASS_BORDER  = pr.Color(65, 80, 115, 255)
 COLOR_TEXT_MAIN     = pr.Color(245, 248, 255, 255)
 COLOR_TEXT_MUTED    = pr.Color(160, 175, 200, 255)
@@ -32,10 +44,10 @@ COLOR_BTN_BORDER    = pr.Color(80, 105, 150, 255)
 
 class UIRenderer:
     # Title Menu Layout
-    CARD_W = 520
-    CARD_H = 540
+    CARD_W = 540
+    CARD_H = 550
     CARD_X = (SCREEN_WIDTH - CARD_W) // 2
-    CARD_Y = 80
+    CARD_Y = 75
 
     BTN_W = CARD_W - 70
     BTN_H = 48
@@ -44,6 +56,11 @@ class UIRenderer:
     BTN_X = CARD_X + 35
 
     def __init__(self):
+        # Load high-resolution smooth vector fonts
+        self.font_regular = None
+        self.font_bold = None
+        self._init_fonts()
+
         self.menu_index = 0
         self.menu_items = [
             "PLAY MATCH (3v3)",
@@ -78,6 +95,48 @@ class UIRenderer:
         self.shot_meter_feedback = ""
         self.shot_meter_feedback_timer = 0.0
         self.shot_meter_feedback_col = COLOR_GREEN_PERFECT
+
+    def _init_fonts(self):
+        """Loads smooth vector TTF fonts with bilinear filtering."""
+        try:
+            reg_path = get_asset_path(os.path.join("assets", "fonts", "font_regular.ttf"))
+            bold_path = get_asset_path(os.path.join("assets", "fonts", "font_bold.ttf"))
+            if os.path.exists(reg_path):
+                self.font_regular = pr.load_font_ex(reg_path, 64, None, 0)
+                pr.set_texture_filter(self.font_regular.texture, pr.TEXTURE_FILTER_BILINEAR)
+            if os.path.exists(bold_path):
+                self.font_bold = pr.load_font_ex(bold_path, 64, None, 0)
+                pr.set_texture_filter(self.font_bold.texture, pr.TEXTURE_FILTER_BILINEAR)
+        except Exception as e:
+            print(f"[UI] Font loading notice: {e}")
+
+    def cleanup(self):
+        if self.font_regular is not None:
+            try:
+                pr.unload_font(self.font_regular)
+            except Exception:
+                pass
+        if self.font_bold is not None:
+            try:
+                pr.unload_font(self.font_bold)
+            except Exception:
+                pass
+
+    def draw_text(self, text, x, y, size, color, bold=False):
+        """Draws crisp vector text with smooth bilinear anti-aliasing."""
+        font = self.font_bold if bold else (self.font_regular or self.font_bold)
+        if font is not None:
+            pr.draw_text_ex(font, str(text), pr.Vector2(float(x), float(y)), float(size), 1.0, color)
+        else:
+            pr.draw_text(str(text), int(x), int(y), int(size), color)
+
+    def measure_text(self, text, size, bold=False) -> int:
+        """Measures vector text width accurately."""
+        font = self.font_bold if bold else (self.font_regular or self.font_bold)
+        if font is not None:
+            vec = pr.measure_text_ex(font, str(text), float(size), 1.0)
+            return int(vec.x)
+        return pr.measure_text(str(text), int(size))
 
     def trigger_arcade_popup(self, text, col=COLOR_CYAN_ACCENT, duration=1.0):
         self.arcade_popup_text = text
@@ -185,7 +244,6 @@ class UIRenderer:
 
     def _update_settings_menu(self, input_mgr, audio_mgr, current_diff, cam_ctrl):
         """Interactions within the dedicated Settings modal."""
-        # Navigation
         nav_up = pr.is_key_pressed(pr.KEY_W) or pr.is_key_pressed(pr.KEY_UP)
         nav_down = pr.is_key_pressed(pr.KEY_S) or pr.is_key_pressed(pr.KEY_DOWN)
         left = pr.is_key_pressed(pr.KEY_A) or pr.is_key_pressed(pr.KEY_LEFT)
@@ -250,7 +308,7 @@ class UIRenderer:
         return "NONE", current_diff
 
     def draw_title_screen(self, current_diff, audio_mgr, input_mgr, cam_ctrl=None):
-        """Draws Title screen matching pixel-perfect bounds."""
+        """Draws modern Title screen with smooth vector fonts."""
         card_w = self.CARD_W
         card_h = self.CARD_H
         card_x = self.CARD_X
@@ -262,17 +320,17 @@ class UIRenderer:
 
         # Title Header with 3D Drop Shadow
         title = "FLYHIGH!"
-        tw = pr.measure_text(title, 52)
-        pr.draw_text(title, card_x + (card_w - tw) // 2 + 2, card_y + 24 + 2, 52, pr.Color(10, 12, 18, 200))
-        pr.draw_text(title, card_x + (card_w - tw) // 2, card_y + 24, 52, COLOR_CYAN_ACCENT)
+        tw = self.measure_text(title, 52, bold=True)
+        self.draw_text(title, card_x + (card_w - tw) // 2 + 2, card_y + 24 + 2, 52, pr.Color(10, 12, 18, 200), bold=True)
+        self.draw_text(title, card_x + (card_w - tw) // 2, card_y + 24, 52, COLOR_CYAN_ACCENT, bold=True)
 
-        # Subtitle Tag (Clean ASCII)
-        sub = "* 3v3 ARCADE VOLLEYBALL *"
-        sw = pr.measure_text(sub, 15)
-        tag_bg = pr.Rectangle(card_x + (card_w - sw - 32) // 2, card_y + 86, sw + 32, 26)
+        # Subtitle Tag
+        sub = "3v3 ARCADE VOLLEYBALL"
+        sw = self.measure_text(sub, 16, bold=True)
+        tag_bg = pr.Rectangle(card_x + (card_w - sw - 36) // 2, card_y + 86, sw + 36, 28)
         pr.draw_rectangle_rounded(tag_bg, 0.4, 6, pr.Color(22, 32, 50, 240))
         pr.draw_rectangle_rounded_lines_ex(tag_bg, 0.4, 6, 1, COLOR_GOLD_ACCENT)
-        pr.draw_text(sub, card_x + (card_w - sw) // 2, card_y + 91, 15, COLOR_GOLD_ACCENT)
+        self.draw_text(sub, card_x + (card_w - sw) // 2, card_y + 91, 16, COLOR_GOLD_ACCENT, bold=True)
 
         # Menu Buttons
         for i, item_text in enumerate(self.menu_items):
@@ -289,24 +347,24 @@ class UIRenderer:
 
             # Button Content (100% English)
             if i == 0:
-                txt = "> PLAY MATCH (3v3)"
+                txt = "Play Match (3v3)"
                 tcol = COLOR_GOLD_ACCENT if is_selected else COLOR_TEXT_MAIN
             elif i == 1:
                 diff_label = current_diff.name
-                txt = f"[=] DIFFICULTY: < {diff_label} >"
+                txt = f"Difficulty: < {diff_label} >"
                 tcol = COLOR_CYAN_ACCENT if is_selected else COLOR_TEXT_MAIN
             elif i == 2:
-                txt = "[*] SETTINGS (AUDIO & VIDEO)"
+                txt = "Settings (Audio & Video)"
                 tcol = COLOR_TEXT_MAIN
             elif i == 3:
-                txt = "[?] HOW TO PLAY & CONTROLS"
+                txt = "How to Play & Controls"
                 tcol = COLOR_TEXT_MAIN
             else:
-                txt = "[X] QUIT GAME"
+                txt = "Quit Game"
                 tcol = COLOR_CORAL_ACCENT if is_selected else COLOR_TEXT_MUTED
 
-            tw_btn = pr.measure_text(txt, 17)
-            pr.draw_text(txt, self.BTN_X + (self.BTN_W - tw_btn) // 2, by + 15, 17, tcol)
+            tw_btn = self.measure_text(txt, 18, bold=is_selected)
+            self.draw_text(txt, self.BTN_X + (self.BTN_W - tw_btn) // 2, by + 13, 18, tcol, bold=is_selected)
 
             if is_selected:
                 pr.draw_circle(self.BTN_X + 22, by + self.BTN_H // 2, 4, COLOR_GOLD_ACCENT)
@@ -314,9 +372,9 @@ class UIRenderer:
 
         # Pulsing prompt
         pulse_alpha = int(180 + 75 * math.sin(self.anim_timer * 5.0))
-        prompt_txt = "PRESS [ENTER], [SPACE] OR CLICK TO SELECT"
-        pw = pr.measure_text(prompt_txt, 13)
-        pr.draw_text(prompt_txt, card_x + (card_w - pw) // 2, card_y + card_h - 26, 13, pr.Color(255, 215, 0, pulse_alpha))
+        prompt_txt = "Press [Enter], [Space] or Click to Select"
+        pw = self.measure_text(prompt_txt, 14, bold=False)
+        self.draw_text(prompt_txt, card_x + (card_w - pw) // 2, card_y + card_h - 26, 14, pr.Color(255, 215, 0, pulse_alpha), bold=False)
 
         # Modals
         if self.show_settings_modal:
@@ -325,11 +383,11 @@ class UIRenderer:
             self._draw_controls_modal()
 
     def _draw_settings_modal(self, audio_mgr, cam_ctrl):
-        """Draws full-featured settings configuration panel."""
-        pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 220))
+        """Draws full-featured settings configuration panel with smooth vector fonts."""
+        pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 225))
 
-        mw = 620
-        mh = 490
+        mw = 640
+        mh = 500
         mx = (SCREEN_WIDTH - mw) // 2
         my = (SCREEN_HEIGHT - mh) // 2
 
@@ -337,10 +395,9 @@ class UIRenderer:
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(mx, my, mw, mh), 0.12, 10, 2, COLOR_GOLD_ACCENT)
 
         title = "GAME SETTINGS"
-        tw = pr.measure_text(title, 26)
-        pr.draw_text(title, mx + (mw - tw) // 2, my + 24, 26, COLOR_GOLD_ACCENT)
+        tw = self.measure_text(title, 26, bold=True)
+        self.draw_text(title, mx + (mw - tw) // 2, my + 24, 26, COLOR_GOLD_ACCENT, bold=True)
 
-        # Settings rows
         start_y = my + 75
         row_h = 56
         for idx, item in enumerate(self.settings_items):
@@ -355,21 +412,18 @@ class UIRenderer:
             pr.draw_rectangle_rounded_lines_ex(rec, 0.28, 6, 2 if is_sel else 1, r_border)
 
             lbl_col = COLOR_GOLD_ACCENT if is_sel else COLOR_TEXT_MAIN
-            pr.draw_text(item, mx + 50, ry + 15, 16, lbl_col)
+            self.draw_text(item, mx + 50, ry + 14, 16, lbl_col, bold=is_sel)
 
-            # Option value column
             if idx == 0:
-                # Volume bar
                 vol_pct = int(audio_mgr.volume * 100)
                 val_txt = f"< {vol_pct}% >"
-                # Visual volume level ticks
                 for b in range(10):
                     bar_col = COLOR_CYAN_ACCENT if (b * 10) < vol_pct else pr.Color(60, 70, 90, 200)
                     pr.draw_rectangle(mx + mw - 250 + b * 11, ry + 18, 8, 14, bar_col)
             elif idx == 1:
-                val_txt = "[ ENABLED ]" if audio_mgr.enabled else "[ MUTED ]"
+                val_txt = "[ Enabled ]" if audio_mgr.enabled else "[ Muted ]"
             elif idx == 2:
-                val_txt = "< FULLSCREEN >" if self.is_fullscreen else "< WINDOWED >"
+                val_txt = "< Fullscreen >" if self.is_fullscreen else "< Windowed >"
             elif idx == 3:
                 _, _, res_lbl = RESOLUTIONS[self.res_index]
                 val_txt = f"< {res_lbl} >"
@@ -377,22 +431,22 @@ class UIRenderer:
                 cam_name = cam_ctrl.get_mode_name() if cam_ctrl else "DEFAULT"
                 val_txt = f"< {cam_name} >"
             else:
-                val_txt = "[ PRESS ENTER ]"
+                val_txt = "[ Press Enter ]"
 
-            vw = pr.measure_text(val_txt, 15)
+            vw = self.measure_text(val_txt, 15, bold=is_sel)
             val_col = COLOR_CYAN_ACCENT if is_sel else COLOR_TEXT_MUTED
-            pr.draw_text(val_txt, mx + mw - vw - 50, ry + 16, 15, val_col)
+            self.draw_text(val_txt, mx + mw - vw - 50, ry + 14, 15, val_col, bold=is_sel)
 
-        footer_txt = "[A / D] Adjust Option  |  [W / S] Navigate  |  [ESC] Close"
-        fw = pr.measure_text(footer_txt, 14)
-        pr.draw_text(footer_txt, mx + (mw - fw) // 2, my + mh - 30, 14, COLOR_TEXT_MUTED)
+        footer_txt = "[A / D] Adjust Option   |   [W / S] Navigate   |   [ESC] Close"
+        fw = self.measure_text(footer_txt, 14, bold=False)
+        self.draw_text(footer_txt, mx + (mw - fw) // 2, my + mh - 28, 14, COLOR_TEXT_MUTED, bold=False)
 
     def _draw_controls_modal(self):
-        """Draws card-based How-to-Play controls guide in 100% English."""
-        pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 220))
+        """Draws card-based How-to-Play controls guide in smooth modern vector font."""
+        pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 225))
 
-        mw = 720
-        mh = 540
+        mw = 740
+        mh = 550
         mx = (SCREEN_WIDTH - mw) // 2
         my = (SCREEN_HEIGHT - mh) // 2
 
@@ -400,45 +454,45 @@ class UIRenderer:
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(mx, my, mw, mh), 0.12, 10, 2, COLOR_CYAN_ACCENT)
 
         title = "HOW TO PLAY - 3v3 VOLLEYBALL"
-        tw = pr.measure_text(title, 24)
-        pr.draw_text(title, mx + (mw - tw) // 2, my + 20, 24, COLOR_GOLD_ACCENT)
+        tw = self.measure_text(title, 24, bold=True)
+        self.draw_text(title, mx + (mw - tw) // 2, my + 18, 24, COLOR_GOLD_ACCENT, bold=True)
 
         controls = [
-            ("MOVEMENT", "[W, A, S, D] (D = Screen Right)", "Left Analog / D-Pad"),
+            ("MOVEMENT", "[W, A, S, D] (D = Screen Right)", "Left Stick / D-Pad"),
             ("AIM RETICLE", "Mouse Cursor (Court Floor)", "Right Stick"),
+            ("HOLD / TOSS SERVE", "[R-CLICK] to Toss into Air", "(Y) Button"),
             ("JUMP", "[SPACE] (Always Active)", "(A) Button"),
-            ("SERVE TOSS", "[SPACE] or [L-CLICK] to Toss", "(A) or (X)"),
-            ("IN-AIR SPIKE", "[L-CLICK] (Shot Meter Timing)", "In-Air (A)"),
-            ("FLOAT SERVE", "[L-CLICK + E] (Green Timing)", "In-Air (A) + (X)"),
-            ("IN-AIR DUMP / TIP", "[E] (Soft Feather over Net)", "In-Air (X)"),
-            ("AIR BAILOUT", "[L-CTRL + L-CLICK] (Emergency)", "In-Air (LT) + (A)"),
-            ("PASS / SET", "[R-CLICK] (Overhead Pass)", "(Y) Button"),
+            ("POWER SPIKE (IN-AIR)", "[L-CLICK] (Shot Meter Timing)", "In-Air (A)"),
+            ("FLOAT SERVE (IN-AIR)", "[L-CLICK + E] (Green Timing)", "In-Air (A) + (X)"),
+            ("DUMP / TIP (IN-AIR)", "[E] (Soft Feather over Net)", "In-Air (X)"),
+            ("AIR BAILOUT (IN-AIR)", "[L-CTRL + L-CLICK] (Emergency)", "In-Air (LT) + (A)"),
+            ("PASS / SET (GROUND)", "[R-CLICK] (Overhead Pass)", "(Y) Button"),
             ("SETTER DUMP", "[R-CLICK + E] (Surprise Attack)", "(Y) + (X)"),
             ("RECEIVE / DIG", "[L-CTRL] (Directs to Cursor)", "(LT) / (X)"),
             ("ROLL DIG (5s CD)", "[L-CTRL + R-CLICK] (Dive Roll)", "(LT) + (Y)"),
         ]
 
-        start_y = my + 60
+        start_y = my + 56
         for idx, (label, kb, gp) in enumerate(controls):
             col_idx = idx % 2
             row_idx = idx // 2
-            card_x = mx + 24 + col_idx * 340
-            card_y = start_y + row_idx * 72
+            card_x = mx + 22 + col_idx * 350
+            card_y = start_y + row_idx * 74
 
-            c_rec = pr.Rectangle(card_x, card_y, 330, 64)
+            c_rec = pr.Rectangle(card_x, card_y, 340, 66)
             pr.draw_rectangle_rounded(c_rec, 0.22, 6, pr.Color(22, 28, 42, 220))
             pr.draw_rectangle_rounded_lines_ex(c_rec, 0.22, 6, 1, COLOR_GLASS_BORDER)
 
-            pr.draw_text(label, card_x + 12, card_y + 8, 13, COLOR_CYAN_ACCENT)
-            pr.draw_text(f"PC: {kb}", card_x + 12, card_y + 26, 12, COLOR_TEXT_MAIN)
-            pr.draw_text(f"Gamepad: {gp}", card_x + 12, card_y + 44, 12, COLOR_TEXT_MUTED)
+            self.draw_text(label, card_x + 12, card_y + 8, 14, COLOR_CYAN_ACCENT, bold=True)
+            self.draw_text(f"PC: {kb}", card_x + 12, card_y + 26, 12, COLOR_TEXT_MAIN, bold=False)
+            self.draw_text(f"Gamepad: {gp}", card_x + 12, card_y + 44, 12, COLOR_TEXT_MUTED, bold=False)
 
-        close_txt = "Press [ESC], [ENTER], or Click Anywhere to Close"
-        cw = pr.measure_text(close_txt, 14)
-        pr.draw_text(close_txt, mx + (mw - cw) // 2, my + mh - 26, 14, COLOR_GOLD_ACCENT)
+        close_txt = "Press [ESC], [Enter], or Click Anywhere to Close"
+        cw = self.measure_text(close_txt, 14, bold=False)
+        self.draw_text(close_txt, mx + (mw - cw) // 2, my + mh - 26, 14, COLOR_GOLD_ACCENT, bold=False)
 
     def draw_shot_meter(self, timing_ratio, is_visible):
-        """Renders NBA 2K-Style Shot Timing Meter for jump serves and spikes."""
+        """Renders NBA 2K-Style Shot Timing Meter with clean fonts."""
         dt = pr.get_frame_time()
         if self.shot_meter_feedback_timer > 0.0:
             self.shot_meter_feedback_timer -= dt
@@ -446,13 +500,13 @@ class UIRenderer:
         # Feedback notification banner
         if self.shot_meter_feedback_timer > 0.0:
             fb_txt = self.shot_meter_feedback
-            fw = pr.measure_text(fb_txt, 22)
+            fw = self.measure_text(fb_txt, 22, bold=True)
             fx = (SCREEN_WIDTH - fw) // 2
             fy = SCREEN_HEIGHT // 2 + 65
 
-            pr.draw_rectangle_rounded(pr.Rectangle(fx - 16, fy - 6, fw + 32, 34), 0.4, 6, pr.Color(16, 20, 30, 220))
-            pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(fx - 16, fy - 6, fw + 32, 34), 0.4, 6, 2, self.shot_meter_feedback_col)
-            pr.draw_text(fb_txt, fx, fy, 22, self.shot_meter_feedback_col)
+            pr.draw_rectangle_rounded(pr.Rectangle(fx - 18, fy - 6, fw + 36, 36), 0.4, 6, pr.Color(16, 20, 30, 230))
+            pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(fx - 18, fy - 6, fw + 36, 36), 0.4, 6, 2, self.shot_meter_feedback_col)
+            self.draw_text(fb_txt, fx, fy, 22, self.shot_meter_feedback_col, bold=True)
 
         if not is_visible:
             return
@@ -467,7 +521,6 @@ class UIRenderer:
         pr.draw_rectangle_rounded(pr.Rectangle(gx, gy, gauge_w, gauge_h), 0.5, 6, pr.Color(18, 22, 32, 230))
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(gx, gy, gauge_w, gauge_h), 0.5, 6, 2, COLOR_GLASS_BORDER)
 
-        # Zones (Bottom = Red, Middle = Yellow, Top Sweet Spot = Neon Green)
         # 1. Red Zone (0.0 to 0.50)
         red_h = int(gauge_h * 0.50)
         pr.draw_rectangle(gx + 4, gy + gauge_h - red_h - 4, gauge_w - 8, red_h, pr.Color(220, 50, 60, 160))
@@ -481,27 +534,25 @@ class UIRenderer:
         pr.draw_rectangle(gx + 4, gy + 4, gauge_w - 8, grn_h, COLOR_GREEN_PERFECT)
         pr.draw_rectangle_lines(gx + 4, gy + 4, gauge_w - 8, grn_h, pr.Color(255, 255, 255, 240))
 
-        # Dynamic Needle based on timing ratio (0.0 at bottom, 1.0 at top)
+        # Dynamic Needle
         clamped_ratio = max(0.0, min(1.0, timing_ratio))
         needle_y = gy + gauge_h - 4 - int((gauge_h - 8) * clamped_ratio)
         
-        # Glow color based on current needle position
         needle_col = COLOR_GREEN_PERFECT if clamped_ratio >= 0.82 else (COLOR_GOLD_ACCENT if clamped_ratio >= 0.50 else COLOR_CORAL_ACCENT)
         pr.draw_rectangle(gx - 4, needle_y - 2, gauge_w + 8, 5, needle_col)
         pr.draw_circle(gx + gauge_w // 2, needle_y, 4, pr.Color(255, 255, 255, 255))
 
-        # Header tag
-        pr.draw_text("TIMING", gx - 8, gy - 20, 12, COLOR_GOLD_ACCENT)
+        self.draw_text("TIMING", gx - 8, gy - 20, 12, COLOR_GOLD_ACCENT, bold=True)
 
     def draw_hud(self, match_mgr, input_mgr, cam_ctrl, ai_difficulty, player):
-        """Draws scoreboard, touch counter, Roll Dig cooldown badge, and bottom control helper."""
+        """Draws modern scoreboard, touch counter, and bottom control helper."""
         dt = pr.get_frame_time()
         if self.arcade_popup_timer > 0.0:
             self.arcade_popup_timer -= dt
 
         # 1. Top Scoreboard Pill
         bar_w = 540
-        bar_h = 62
+        bar_h = 64
         bar_x = (SCREEN_WIDTH - bar_w) // 2
         bar_y = 12
 
@@ -509,30 +560,30 @@ class UIRenderer:
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(bar_x, bar_y, bar_w, bar_h), 0.4, 8, 2, COLOR_GLASS_BORDER)
 
         # Team Player (Cyan Pill)
-        pr.draw_rectangle_rounded(pr.Rectangle(bar_x + 14, bar_y + 10, 180, 42), 0.4, 6, pr.Color(20, 60, 110, 200))
-        pr.draw_text("YOU (3v3)", bar_x + 28, bar_y + 22, 16, COLOR_CYAN_ACCENT)
+        pr.draw_rectangle_rounded(pr.Rectangle(bar_x + 14, bar_y + 10, 180, 44), 0.4, 6, pr.Color(20, 60, 110, 200))
+        self.draw_text("YOU (3v3)", bar_x + 28, bar_y + 22, 16, COLOR_CYAN_ACCENT, bold=True)
         p_score = f"{match_mgr.score_player:02d}"
-        pr.draw_text(p_score, bar_x + 140, bar_y + 14, 34, COLOR_CYAN_ACCENT)
+        self.draw_text(p_score, bar_x + 140, bar_y + 14, 34, COLOR_CYAN_ACCENT, bold=True)
         if match_mgr.serving_team == Team.PLAYER:
             pr.draw_circle(bar_x + 12, bar_y + bar_h // 2, 5, COLOR_GOLD_ACCENT)
 
         # Center Divider & Target
-        pr.draw_text("VS", bar_x + bar_w // 2 - 12, bar_y + 12, 18, pr.GRAY)
+        self.draw_text("VS", bar_x + bar_w // 2 - 12, bar_y + 14, 18, pr.GRAY, bold=True)
         target_str = f"TO {match_mgr.points_to_win}"
-        pr.draw_text(target_str, bar_x + bar_w // 2 - 22, bar_y + 36, 13, COLOR_GOLD_ACCENT)
+        self.draw_text(target_str, bar_x + bar_w // 2 - 22, bar_y + 38, 13, COLOR_GOLD_ACCENT, bold=False)
 
         # Team Opponent (Crimson Pill)
-        pr.draw_rectangle_rounded(pr.Rectangle(bar_x + bar_w - 194, bar_y + 10, 180, 42), 0.4, 6, pr.Color(110, 25, 40, 200))
+        pr.draw_rectangle_rounded(pr.Rectangle(bar_x + bar_w - 194, bar_y + 10, 180, 44), 0.4, 6, pr.Color(110, 25, 40, 200))
         o_score = f"{match_mgr.score_opponent:02d}"
-        pr.draw_text(o_score, bar_x + bar_w - 180, bar_y + 14, 34, COLOR_CORAL_ACCENT)
-        pr.draw_text("CPU (3v3)", bar_x + bar_w - 124, bar_y + 22, 16, COLOR_CORAL_ACCENT)
+        self.draw_text(o_score, bar_x + bar_w - 180, bar_y + 14, 34, COLOR_CORAL_ACCENT, bold=True)
+        self.draw_text("CPU (3v3)", bar_x + bar_w - 124, bar_y + 22, 16, COLOR_CORAL_ACCENT, bold=True)
         if match_mgr.serving_team == Team.OPPONENT:
             pr.draw_circle(bar_x + bar_w - 12, bar_y + bar_h // 2, 5, COLOR_GOLD_ACCENT)
 
         # 2. Touch Counter Badge
         if match_mgr.state == MatchState.IN_RALLY:
             touches = match_mgr.get_touches(Team.PLAYER)
-            badge_w = 240
+            badge_w = 250
             badge_h = 36
             bx = (SCREEN_WIDTH - badge_w) // 2
             by = bar_y + bar_h + 10
@@ -553,22 +604,22 @@ class UIRenderer:
                 t_lbl = "TOUCH: 3/3 (SPIKE ATTACK!)"
                 t_col = COLOR_CORAL_ACCENT
 
-            tw = pr.measure_text(t_lbl, 14)
-            pr.draw_text(t_lbl, bx + (badge_w - tw) // 2, by + 11, 14, t_col)
+            tw = self.measure_text(t_lbl, 14, bold=True)
+            self.draw_text(t_lbl, bx + (badge_w - tw) // 2, by + 10, 14, t_col, bold=True)
 
         # 3. Dynamic Arcade Popup Banner
         if self.arcade_popup_timer > 0.0:
             p_text = self.arcade_popup_text
-            pw = pr.measure_text(p_text, 36)
+            pw = self.measure_text(p_text, 36, bold=True)
             p_x = (SCREEN_WIDTH - pw) // 2
             p_y = 145
-            pr.draw_text(p_text, p_x + 2, p_y + 2, 36, pr.Color(10, 10, 15, 220))
-            pr.draw_text(p_text, p_x, p_y, 36, self.arcade_popup_col)
+            self.draw_text(p_text, p_x + 2, p_y + 2, 36, pr.Color(10, 10, 15, 220), bold=True)
+            self.draw_text(p_text, p_x, p_y, 36, self.arcade_popup_col, bold=True)
 
         # 4. Roll Dig 5-Second Cooldown Badge
         cd = player.roll_dig_cooldown
-        cd_w = 190
-        cd_h = 32
+        cd_w = 195
+        cd_h = 34
         cd_x = 24
         cd_y = SCREEN_HEIGHT - 82
 
@@ -578,17 +629,16 @@ class UIRenderer:
 
         if cd <= 0.0:
             cd_txt = "ROLL DIG: READY"
-            pr.draw_text(cd_txt, cd_x + 12, cd_y + 9, 13, COLOR_CYAN_ACCENT)
-            pr.draw_circle(cd_x + cd_w - 18, cd_y + 16, 5, COLOR_GREEN_PERFECT)
+            self.draw_text(cd_txt, cd_x + 12, cd_y + 9, 13, COLOR_CYAN_ACCENT, bold=True)
+            pr.draw_circle(cd_x + cd_w - 18, cd_y + 17, 5, COLOR_GREEN_PERFECT)
         else:
             cd_txt = f"ROLL DIG: {cd:.1f}s"
-            pr.draw_text(cd_txt, cd_x + 12, cd_y + 9, 13, COLOR_TEXT_MUTED)
-            # Refill progress bar
+            self.draw_text(cd_txt, cd_x + 12, cd_y + 9, 13, COLOR_TEXT_MUTED, bold=False)
             prog = 1.0 - (cd / ROLL_DIG_COOLDOWN)
-            pr.draw_rectangle(cd_x + cd_w - 55, cd_y + 12, int(40 * prog), 8, COLOR_GOLD_ACCENT)
-            pr.draw_rectangle_lines(cd_x + cd_w - 55, cd_y + 12, 40, 8, COLOR_GLASS_BORDER)
+            pr.draw_rectangle(cd_x + cd_w - 55, cd_y + 13, int(40 * prog), 8, COLOR_GOLD_ACCENT)
+            pr.draw_rectangle_lines(cd_x + cd_w - 55, cd_y + 13, 40, 8, COLOR_GLASS_BORDER)
 
-        # 5. Bottom Control Helper Bar (100% English)
+        # 5. Bottom Control Helper Bar
         bot_h = 38
         bot_y = SCREEN_HEIGHT - bot_h - 8
         bot_w = SCREEN_WIDTH - 48
@@ -599,24 +649,24 @@ class UIRenderer:
 
         device = input_mgr.active_device
         if device == "GAMEPAD":
-            ctrl_str = "[L-STICK] Move | (A) Jump/Spike | (X) Dump | (Y) Set | (LT) Dig | (LT+Y) Roll Dig | (BACK) Cam"
+            ctrl_str = "Toss: (Y) | Jump: (A) | Spike: (A) | Dump: (X) | Set: (Y) | Dig: (LT) | Roll: (LT+Y)"
         else:
-            ctrl_str = "[WASD] Move | [SPACE] Jump | [LMB] Spike | [LMB+E] Float Serve | [E] Dump | [RMB] Set | [L-CTRL] Dig | [L-CTRL+RMB] Roll Dig"
+            ctrl_str = "Toss: [R-CLICK] | Jump: [SPACE] | Spike: [LMB] | Float: [LMB+E] | Dump: [E] | Dig: [L-CTRL] | Roll Dig: [L-CTRL+RMB]"
 
-        pr.draw_text(f"CONTROLS ({device}):", bot_x + 14, bot_y + 12, 12, COLOR_GOLD_ACCENT)
-        pr.draw_text(ctrl_str, bot_x + 165, bot_y + 12, 12, COLOR_TEXT_MAIN)
+        self.draw_text(f"CONTROLS ({device}):", bot_x + 14, bot_y + 11, 13, COLOR_GOLD_ACCENT, bold=True)
+        self.draw_text(ctrl_str, bot_x + 175, bot_y + 11, 13, COLOR_TEXT_MAIN, bold=False)
 
         # Top-left and Top-right info
         cam_info = f"CAM: {cam_ctrl.get_mode_name()} [TAB]"
-        pr.draw_text(cam_info, 18, 16, 13, COLOR_TEXT_MUTED)
+        self.draw_text(cam_info, 18, 16, 13, COLOR_TEXT_MUTED, bold=False)
         diff_info = f"AI: {ai_difficulty.name}"
-        dw = pr.measure_text(diff_info, 13)
-        pr.draw_text(diff_info, SCREEN_WIDTH - dw - 18, 16, 13, COLOR_TEXT_MUTED)
+        dw = self.measure_text(diff_info, 13, bold=False)
+        self.draw_text(diff_info, SCREEN_WIDTH - dw - 18, 16, 13, COLOR_TEXT_MUTED, bold=False)
 
     def draw_serve_prompt(self, match_mgr, input_mgr):
-        """Displays clear serving prompt with 100% clean English text."""
+        """Displays clear serving prompt with explicit RIGHT-CLICK toss instruction."""
         if match_mgr.state == MatchState.SERVE_READY:
-            card_w = 540
+            card_w = 560
             card_h = 54
             cx = (SCREEN_WIDTH - card_w) // 2
             cy = 135
@@ -625,17 +675,17 @@ class UIRenderer:
             pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(cx, cy, card_w, card_h), 0.3, 6, 2, COLOR_GOLD_ACCENT)
 
             if match_mgr.serving_team == Team.PLAYER:
-                txt = "YOUR SERVE: Press [SPACE] or [L-CLICK] to Toss the Ball!"
+                txt = "HOLDING BALL: Press [RIGHT CLICK] to Toss the Ball!"
                 col = COLOR_GOLD_ACCENT
             else:
                 txt = "OPPONENT SERVING... Get Ready to Dig with [L-CTRL]!"
                 col = COLOR_CORAL_ACCENT
 
-            tw = pr.measure_text(txt, 15)
-            pr.draw_text(txt, cx + (card_w - tw) // 2, cy + 18, 15, col)
+            tw = self.measure_text(txt, 16, bold=True)
+            self.draw_text(txt, cx + (card_w - tw) // 2, cy + 18, 16, col, bold=True)
 
         elif match_mgr.state == MatchState.SERVE_TOSSED:
-            card_w = 600
+            card_w = 640
             card_h = 54
             cx = (SCREEN_WIDTH - card_w) // 2
             cy = 135
@@ -644,17 +694,17 @@ class UIRenderer:
             pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(cx, cy, card_w, card_h), 0.3, 6, 2, COLOR_CYAN_ACCENT)
 
             if match_mgr.serving_team == Team.PLAYER:
-                txt = "HIT: Jump [SPACE] -> [L-CLICK] Power Spike | [L-CLICK + E] Float Serve"
+                txt = "BALL IN AIR! Jump [SPACE] -> [L-CLICK] Spike | [L-CLICK + E] Float | [E] Dump"
                 col = COLOR_CYAN_ACCENT
             else:
                 txt = "BALL INCOMING! Aim Cursor and Hold [L-CTRL] to Dig!"
                 col = COLOR_CORAL_ACCENT
 
-            tw = pr.measure_text(txt, 14)
-            pr.draw_text(txt, cx + (card_w - tw) // 2, cy + 18, 14, col)
+            tw = self.measure_text(txt, 15, bold=True)
+            self.draw_text(txt, cx + (card_w - tw) // 2, cy + 18, 15, col, bold=True)
 
     def draw_point_banner(self, match_mgr):
-        """Displays point award banner in 100% English."""
+        """Displays point award banner with smooth fonts."""
         if match_mgr.state == MatchState.POINT_SCORED:
             banner_w = 540
             banner_h = 95
@@ -666,15 +716,15 @@ class UIRenderer:
             pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(bx, by, banner_w, banner_h), 0.3, 8, 3, winner_col)
 
             win_title = "POINT FOR YOU! (3v3)" if match_mgr.point_winner == Team.PLAYER else "POINT FOR OPPONENT"
-            tw1 = pr.measure_text(win_title, 25)
-            pr.draw_text(win_title, bx + (banner_w - tw1) // 2, by + 16, 25, winner_col)
+            tw1 = self.measure_text(win_title, 25, bold=True)
+            self.draw_text(win_title, bx + (banner_w - tw1) // 2, by + 16, 25, winner_col, bold=True)
 
             reason_str = match_mgr.point_reason
-            tw2 = pr.measure_text(reason_str, 17)
-            pr.draw_text(reason_str, bx + (banner_w - tw2) // 2, by + 56, 17, COLOR_TEXT_MAIN)
+            tw2 = self.measure_text(reason_str, 17, bold=False)
+            self.draw_text(reason_str, bx + (banner_w - tw2) // 2, by + 56, 17, COLOR_TEXT_MAIN, bold=False)
 
     def draw_match_over(self, match_mgr, input_mgr):
-        """Draws match end screen in 100% English."""
+        """Draws match end screen with smooth fonts."""
         if match_mgr.state == MatchState.MATCH_OVER:
             pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 220))
 
@@ -688,31 +738,31 @@ class UIRenderer:
             pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(cx, cy, card_w, card_h), 0.25, 8, 3, win_col)
 
             main_text = "MATCH WON! (VICTORY)" if match_mgr.winner == Team.PLAYER else "MATCH OVER (DEFEAT)"
-            tw = pr.measure_text(main_text, 30)
-            pr.draw_text(main_text, cx + (card_w - tw) // 2, cy + 30, 30, win_col)
+            tw = self.measure_text(main_text, 30, bold=True)
+            self.draw_text(main_text, cx + (card_w - tw) // 2, cy + 30, 30, win_col, bold=True)
 
             score_text = f"Final Score: YOU {match_mgr.score_player} - {match_mgr.score_opponent} CPU"
-            sw = pr.measure_text(score_text, 22)
-            pr.draw_text(score_text, cx + (card_w - sw) // 2, cy + 95, 22, COLOR_TEXT_MAIN)
+            sw = self.measure_text(score_text, 22, bold=False)
+            self.draw_text(score_text, cx + (card_w - sw) // 2, cy + 95, 22, COLOR_TEXT_MAIN, bold=False)
 
             rematch_text = "[SPACE] or [L-CLICK] for Rematch"
-            rw = pr.measure_text(rematch_text, 19)
-            pr.draw_text(rematch_text, cx + (card_w - rw) // 2, cy + 160, 19, COLOR_GOLD_ACCENT)
+            rw = self.measure_text(rematch_text, 19, bold=True)
+            self.draw_text(rematch_text, cx + (card_w - rw) // 2, cy + 160, 19, COLOR_GOLD_ACCENT, bold=True)
 
             quit_text = "[ESC] / (START) Return to Title Menu"
-            qw = pr.measure_text(quit_text, 15)
-            pr.draw_text(quit_text, cx + (card_w - qw) // 2, cy + 220, 15, COLOR_TEXT_MUTED)
+            qw = self.measure_text(quit_text, 15, bold=False)
+            self.draw_text(quit_text, cx + (card_w - qw) // 2, cy + 220, 15, COLOR_TEXT_MUTED, bold=False)
 
     def draw_pause_menu(self, input_mgr, audio_mgr, cam_ctrl=None):
-        """Draws Pause overlay with settings option."""
+        """Draws Pause overlay with smooth modern vector fonts."""
         if self.show_settings_modal:
             self._draw_settings_modal(audio_mgr, cam_ctrl)
             return
 
-        pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 190))
+        pr.draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, pr.Color(8, 10, 16, 200))
         
-        card_w = 500
-        card_h = 300
+        card_w = 520
+        card_h = 310
         cx = (SCREEN_WIDTH - card_w) // 2
         cy = (SCREEN_HEIGHT - card_h) // 2
 
@@ -720,11 +770,11 @@ class UIRenderer:
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(cx, cy, card_w, card_h), 0.25, 8, 2, COLOR_GLASS_BORDER)
 
         title = "MATCH PAUSED"
-        tw = pr.measure_text(title, 26)
-        pr.draw_text(title, cx + (card_w - tw) // 2, cy + 24, 26, COLOR_TEXT_MAIN)
+        tw = self.measure_text(title, 26, bold=True)
+        self.draw_text(title, cx + (card_w - tw) // 2, cy + 24, 26, COLOR_TEXT_MAIN, bold=True)
 
-        pr.draw_text("[ESC] / (START)  Resume Match", cx + 75, cy + 80, 16, COLOR_GOLD_ACCENT)
-        pr.draw_text("[S]              Settings (Audio & Video)", cx + 75, cy + 120, 16, COLOR_CYAN_ACCENT)
-        pr.draw_text("[TAB] / (BACK)   Change Camera Angle", cx + 75, cy + 160, 16, COLOR_TEXT_MAIN)
-        pr.draw_text("[M]              Mute Sound Toggle", cx + 75, cy + 200, 16, COLOR_TEXT_MAIN)
-        pr.draw_text("[Q]              Quit to Title Menu", cx + 75, cy + 240, 16, COLOR_CORAL_ACCENT)
+        self.draw_text("[ESC] / (START)  Resume Match", cx + 75, cy + 80, 17, COLOR_GOLD_ACCENT, bold=True)
+        self.draw_text("[S]              Settings (Audio & Video)", cx + 75, cy + 122, 17, COLOR_CYAN_ACCENT, bold=True)
+        self.draw_text("[TAB] / (BACK)   Change Camera Angle", cx + 75, cy + 164, 17, COLOR_TEXT_MAIN, bold=False)
+        self.draw_text("[M]              Mute Sound Toggle", cx + 75, cy + 206, 17, COLOR_TEXT_MAIN, bold=False)
+        self.draw_text("[Q]              Quit to Title Menu", cx + 75, cy + 248, 17, COLOR_CORAL_ACCENT, bold=True)

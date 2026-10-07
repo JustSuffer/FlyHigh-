@@ -249,31 +249,36 @@ class VolleyballGame:
         # 4. SERVE MECHANICS
         if self.match_mgr.state == MatchState.SERVE_READY:
             if self.match_mgr.serving_team == Team.PLAYER:
-                # Lock ball strictly in player's hands until toss
+                # Keep ball firmly held in server hands until user deliberately tosses
                 self.ball.x = self.player.x
                 self.ball.y = self.player.y + 1.35
                 self.ball.z = self.player.z + 0.65
-                self.ball.vx = self.ball.vy = self.ball.vz = 0.0
+                self.ball.vx = 0.0
+                self.ball.vy = 0.0
+                self.ball.vz = 0.0
                 self.ball.in_air = False
 
-                # Toss Trigger: [SPACE], Left Click, or Gamepad (A)
+                # EXCLUSIVE TOSS TRIGGER: Right Click (or Gamepad Y). SPACE or Left Click will NEVER toss!
                 toss_triggered = (
-                    self.input_mgr.jump_pressed or
-                    pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_LEFT) or
-                    self.input_mgr.bump_pressed
+                    pr.is_mouse_button_pressed(pr.MOUSE_BUTTON_RIGHT) or
+                    (pr.is_gamepad_available(self.input_mgr.gamepad_id) and
+                     pr.is_gamepad_button_pressed(self.input_mgr.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_UP))
                 )
                 if toss_triggered:
                     self.match_mgr.state = MatchState.SERVE_TOSSED
                     # Toss ball high into the air
                     self.ball.launch_arc(self.player.x, self.player.z + 0.75, peak_height=4.2)
                     self.audio_mgr.play("whistle")
+                    self.ui.trigger_arcade_popup("BALL TOSSED! JUMP & HIT!", COLOR_GOLD_ACCENT, 1.0)
             else:
                 # Opponent serving: lock in opponent 3 hands
                 srv = self.opponent_3
                 self.ball.x = srv.x
                 self.ball.y = srv.y + 1.35
                 self.ball.z = srv.z - 0.65
-                self.ball.vx = self.ball.vy = self.ball.vz = 0.0
+                self.ball.vx = 0.0
+                self.ball.vy = 0.0
+                self.ball.vz = 0.0
                 self.ball.in_air = False
 
                 self.ai_serve_timer -= dt
@@ -285,6 +290,12 @@ class VolleyballGame:
 
         elif self.match_mgr.state == MatchState.SERVE_TOSSED:
             if self.match_mgr.serving_team == Team.PLAYER:
+                # If player tossed but missed the hit and ball hits the floor: retoss!
+                if self.ball.has_bounced or (self.ball.y <= BALL_RADIUS + 0.06 and self.ball.vy <= 0):
+                    self.setup_serve()
+                    self.ui.trigger_arcade_popup("MISSED TOSS! RIGHT-CLICK TO RETOSS", COLOR_CORAL_ACCENT, 1.2)
+                    return
+
                 dist_ball = math.sqrt((self.ball.x - self.player.x)**2 + (self.ball.z - self.player.z)**2)
                 
                 # Player must jump into air to strike jump serve / float serve!
@@ -591,5 +602,6 @@ class VolleyballGame:
         pr.end_drawing()
 
     def cleanup(self):
+        self.ui.cleanup()
         self.audio_mgr.close()
         pr.close_window()
