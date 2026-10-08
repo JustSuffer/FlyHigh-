@@ -140,53 +140,52 @@ class TeamAIController:
             char.z = clamped_z
 
             # 3. Ball Interaction if this AI reaches the ball
-            if is_ball_on_my_side and ball.in_air and not ball.has_bounced:
+            if is_ball_on_my_side and ball.in_air and not ball.has_bounced and ball.can_be_hit_by(char):
                 horiz_dist_ball = math.sqrt((ball.x - char.x)**2 + (ball.z - char.z)**2)
 
-                # A. SPIKE / ATTACK (Touch 3, or aggressive touch 2 near net)
+                # A. SPIKE / ATTACK PREP (Touch 3, or aggressive touch 2 near net)
                 if (team_touches >= 2 or (team_touches >= 1 and abs(char.z) < 2.8)) and not self.spike_prep_done[i]:
-                    if horiz_dist_ball < 2.0 and 2.2 < ball.y < 3.9 and ball.time_to_impact < 0.65:
+                    if horiz_dist_ball < 2.2 and 2.0 < ball.y < 4.2 and ball.time_to_impact < 0.8:
                         char.jump()
                         self.spike_prep_done[i] = True
 
-                # If in air near jump peak: EXECUTE SPIKE!
-                if not char.is_grounded and char.y > 0.5:
-                    if horiz_dist_ball < 1.7 and abs(ball.y - (char.y + 1.6)) < 1.3:
+                # In-Air: EXECUTE SPIKE!
+                if not char.is_grounded and char.y > 0.45:
+                    if horiz_dist_ball < 1.8 and abs(ball.y - (char.y + 1.6)) < 1.4:
                         char.trigger_action(PlayerAction.SPIKE, 0.35)
                         # Aim spike towards open spaces in the other court
                         target_x = random.choice([-2.8, 0.0, 2.8])
                         target_z = -5.8 + random.uniform(-2.0, 1.5) if self.team == Team.OPPONENT else 5.8 + random.uniform(-1.5, 2.0)
-                        ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=spike_speed)
+                        ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=spike_speed, hitter=char)
                         match_mgr.register_hit(self.team, char, "SPIKE")
                         self.spike_prep_done[i] = False
                         return
 
-                # B. BUMP / DIG (Receive - Touch 1)
-                if char.is_grounded and horiz_dist_ball < 1.7 and 0.3 < ball.y < 2.5:
+                # Grounded Interactions (Authentic 3-Touch Flow)
+                if char.is_grounded and horiz_dist_ball < 1.8 and 0.3 < ball.y < 2.8:
                     if team_touches == 0:
+                        # TOUCH 1: BUMP / DIG (Receive) -> High float to setter near net
                         char.trigger_action(PlayerAction.BUMP, 0.35)
-                        # Bump to setter position near net
                         setter_x = -1.8 if self.team == Team.PLAYER else 1.8
-                        setter_z = -2.0 if self.team == Team.PLAYER else 2.0
-                        ball.launch_arc(setter_x, setter_z, peak_height=4.2)
+                        setter_z = -2.2 if self.team == Team.PLAYER else 2.2
+                        ball.launch_arc(setter_x, setter_z, peak_height=5.2, hitter=char)
                         match_mgr.register_hit(self.team, char, "BUMP")
                         return
 
                     elif team_touches == 1:
-                        # SET / PAS (Touch 2)
+                        # TOUCH 2: SET / PASS -> High lofting set for spiker
                         char.trigger_action(PlayerAction.SET, 0.35)
-                        # Set up high near net for spiker
                         spiker_x = 1.8 if self.team == Team.PLAYER else -1.8
-                        spiker_z = -1.2 if self.team == Team.PLAYER else 1.2
-                        ball.launch_arc(spiker_x, spiker_z, peak_height=3.8)
+                        spiker_z = -1.4 if self.team == Team.PLAYER else 1.4
+                        ball.launch_arc(spiker_x, spiker_z, peak_height=4.8, hitter=char)
                         match_mgr.register_hit(self.team, char, "SET")
                         return
 
                     else:
-                        # 3rd touch emergency return
+                        # TOUCH 3: MUST CLEAR OVER THE NET! Deep attack into opposite court
                         char.trigger_action(PlayerAction.BUMP, 0.35)
-                        ret_x = random.uniform(-3.0, 3.0)
-                        ret_z = -7.0 if self.team == Team.OPPONENT else 7.0
-                        ball.launch_arc(ret_x, ret_z, peak_height=3.4)
+                        ret_x = random.uniform(-2.5, 2.5)
+                        ret_z = -6.5 if self.team == Team.OPPONENT else 6.5
+                        ball.launch_arc(ret_x, ret_z, peak_height=4.6, hitter=char)
                         match_mgr.register_hit(self.team, char, "BUMP")
                         return

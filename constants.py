@@ -29,8 +29,8 @@ ANTENNA_HEIGHT = 0.8              # Extends 80cm above net
 # Ball Physics
 BALL_RADIUS = 0.28
 BALL_MASS = 0.27                  # kg
-GRAVITY = -19.6                   # m/s^2 (snappy arcade gravity)
-BALL_AIR_DRAG = 0.994
+GRAVITY = -11.5                   # m/s^2 (floaty, realistic arcade volleyball gravity)
+BALL_AIR_DRAG = 0.995
 BALL_BOUNCE_RESTITUTION = 0.65    # Floor bounciness
 NET_RESTITUTION = 0.35            # Net bounce absorption
 
@@ -39,7 +39,7 @@ PLAYER_RADIUS = 0.45
 PLAYER_HEIGHT = 1.85
 PLAYER_SPEED = 7.5                # Running speed (m/s)
 PLAYER_SPRINT_SPEED = 10.5        # Dive / Sprint speed
-PLAYER_JUMP_FORCE = 8.5           # Jump velocity (m/s)
+PLAYER_JUMP_FORCE = 7.4           # Jump velocity (m/s) matching floaty gravity
 PLAYER_REACH_RADIUS = 1.6         # Hit reach sphere
 PLAYER_SPIKE_REACH = 2.1          # Reach in air for spikes
 

@@ -85,6 +85,7 @@ class VolleyballGame:
 
         # Timers & Camera Orbit in Menu
         self.ai_serve_timer = 0.0
+        self.serve_toss_timer = 0.0
         self.menu_cam_angle = 0.0
         self.is_paused = False
 
@@ -93,6 +94,7 @@ class VolleyballGame:
 
     def setup_serve(self):
         """Cleanly positions 3v3 teams with zero overlap and locks ball in server hands."""
+        self.serve_toss_timer = 0.0
         if self.match_mgr.serving_team == Team.PLAYER:
             # User serves at baseline (0.0, -8.2)
             self.player.reset_position(0.0, -8.2)
@@ -247,14 +249,48 @@ class VolleyballGame:
                 self.aim_target_z = max(-HALF_LENGTH + 0.4, min(HALF_LENGTH - 0.4, self.aim_target_z))
 
         # 3. CALCULATE NBA 2K-STYLE SHOT METER TIMING
-        # Optimal hit point is when the ball is at apex relative to player reach (player.y + 2.1)
-        ideal_reach_y = self.player.y + 2.1
-        diff_y = abs(self.ball.y - ideal_reach_y)
-        self.shot_meter_timing = max(0.0, min(1.0, 1.0 - (diff_y / 1.35)))
-        self.shot_meter_visible = (
-            (not self.player.is_grounded and self.ball.in_air and self.ball.y > 1.2) or
-            (self.match_mgr.state == MatchState.SERVE_TOSSED and self.match_mgr.serving_team == Team.PLAYER)
-        )
+        if self.match_mgr.state == MatchState.SERVE_TOSSED and self.match_mgr.serving_team == Team.PLAYER:
+            self.serve_toss_timer += dt
+            t = self.serve_toss_timer
+            # Smooth progression: rises to green sweet spot (0.50s - 1.25s), then decays
+            if t < 0.50:
+                self.shot_meter_timing = 0.20 + (t / 0.50) * 0.65  # 0.20 -> 0.85
+            elif t <= 1.25:
+                # Generous Green window (0.75 seconds of green peak)
+                sweet_progress = (t - 0.50) / 0.75
+                self.shot_meter_timing = 0.88 + 0.12 * math.sin(sweet_progress * math.pi)
+            elif t <= 1.55:
+                # Dropping into yellow zone
+                fall_progress = (t - 1.25) / 0.30
+                self.shot_meter_timing = 0.85 - fall_progress * 0.35  # 0.85 -> 0.50
+            else:
+                # Dropping into red / miss
+                self.shot_meter_timing = max(0.1, 0.50 - (t - 1.55) * 0.8)
+
+            # Mid-air reach refinement if player jumped into position:
+            if not self.player.is_grounded:
+                reach_y = self.player.y + 1.95
+                diff = abs(self.ball.y - reach_y)
+                if diff < 0.70:
+                    self.shot_meter_timing = max(self.shot_meter_timing, 0.86 + 0.14 * (1.0 - diff / 0.70))
+
+            self.shot_meter_visible = True
+
+        elif not self.player.is_grounded and self.ball.in_air and self.ball.y > 1.2:
+            # In rally jump attack / block
+            reach_y = self.player.y + 1.95
+            diff_y = abs(self.ball.y - reach_y)
+            if diff_y < 0.70:
+                self.shot_meter_timing = 0.85 + 0.15 * (1.0 - diff_y / 0.70)
+            elif diff_y < 1.40:
+                self.shot_meter_timing = 0.52 + 0.33 * (1.0 - (diff_y - 0.70) / 0.70)
+            else:
+                self.shot_meter_timing = max(0.1, 0.50 * (1.0 - (diff_y - 1.40) / 1.0))
+
+            self.shot_meter_visible = True
+        else:
+            self.shot_meter_timing = 0.0
+            self.shot_meter_visible = False
 
         # 4. SERVE MECHANICS
         if self.match_mgr.state == MatchState.SERVE_READY:
@@ -279,12 +315,13 @@ class VolleyballGame:
                      pr.is_gamepad_button_pressed(self.input_mgr.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_UP))
                 )
                 if toss_triggered:
+                    self.serve_toss_timer = 0.0
                     self.player.trigger_action(PlayerAction.SERVE_TOSS, 0.45)
                     self.match_mgr.state = MatchState.SERVE_TOSSED
-                    # Toss ball high into the air
-                    self.ball.launch_arc(self.player.x, self.player.z + 0.85, peak_height=4.2)
+                    # Toss ball high into the air with generous hang time (~1.7 seconds to peak and reach)
+                    self.ball.launch_arc(self.player.x, self.player.z + 0.85, peak_height=5.4, hitter=self.player)
                     self.audio_mgr.play("whistle")
-                    self.ui.trigger_arcade_popup("BALL TOSSED! JUMP & HIT!", COLOR_GOLD_ACCENT, 1.0)
+                    self.ui.trigger_arcade_popup("BALL TOSSED! JUMP & HIT!", COLOR_GOLD_ACCENT, 1.2)
             else:
                 # Opponent serving: lock in opponent 3 hands
                 srv = self.opponent_3
@@ -304,9 +341,9 @@ class VolleyballGame:
                 if self.ai_serve_timer <= 0.0:
                     srv.trigger_action(PlayerAction.SERVE_TOSS, 0.45)
                     self.match_mgr.state = MatchState.SERVE_TOSSED
-                    self.ball.launch_arc(srv.x, srv.z - 0.85, peak_height=4.2)
+                    self.ball.launch_arc(srv.x, srv.z - 0.85, peak_height=5.2, hitter=srv)
                     self.audio_mgr.play("whistle")
-                    self.ai_serve_timer = 0.55
+                    self.ai_serve_timer = 0.85
 
         elif self.match_mgr.state == MatchState.SERVE_TOSSED:
             if self.match_mgr.serving_team == Team.PLAYER:
@@ -327,7 +364,7 @@ class VolleyballGame:
                     self.input_mgr.rmb_pressed
                 )
 
-                if hit_attempt and dist_ball < 2.2 and self.ball.y > 1.2:
+                if hit_attempt and dist_ball < 2.6 and self.ball.y > 1.2:
                     target_x = self.aim_target_x
                     target_z = max(2.5, self.aim_target_z)  # Target opponent court
                     rating = self._evaluate_timing(self.shot_meter_timing)
@@ -338,14 +375,14 @@ class VolleyballGame:
                         if rating == TimingRating.GREEN:
                             # Knuckleball Float Serve! Erratic drift and steep drop!
                             self.player.trigger_action(PlayerAction.SPIKE, 0.35)
-                            self.ball.launch_arc(target_x, target_z, is_float=True, peak_height=2.75)
+                            self.ball.launch_arc(target_x, target_z, is_float=True, peak_height=3.0, hitter=self.player)
                             self.match_mgr.register_hit(Team.PLAYER, self.player, "SPIKE")
                             self.ui.trigger_arcade_popup("FLOAT SERVE!", COLOR_CYAN_ACCENT)
                             self.input_mgr.trigger_rumble(0.6, 0.8, 0.2)
                         elif rating == TimingRating.YELLOW:
                             # Standard serve (no float)
                             self.player.trigger_action(PlayerAction.SPIKE, 0.35)
-                            self.ball.launch_arc(target_x, target_z, peak_height=3.4)
+                            self.ball.launch_arc(target_x, target_z, peak_height=4.4, hitter=self.player)
                             self.match_mgr.register_hit(Team.PLAYER, self.player, "SPIKE")
                             self.ui.trigger_arcade_popup("GOOD SERVE", COLOR_GOLD_ACCENT)
                             self.input_mgr.trigger_rumble(0.4, 0.4, 0.15)
@@ -354,7 +391,7 @@ class VolleyballGame:
                             self.player.trigger_action(PlayerAction.BUMP, 0.35)
                             rx = target_x + random.uniform(-1.8, 1.8)
                             rz = target_z + random.uniform(-1.8, 1.8)
-                            self.ball.launch_arc(rx, rz, peak_height=4.8)
+                            self.ball.launch_arc(rx, rz, peak_height=5.2, hitter=self.player)
                             self.match_mgr.register_hit(Team.PLAYER, self.player, "BUMP")
                             self.ui.trigger_arcade_popup("MISTIMED SERVE!", COLOR_CORAL_ACCENT)
 
@@ -365,19 +402,19 @@ class VolleyballGame:
                         self.player.trigger_action(PlayerAction.SPIKE, 0.35)
                         if rating == TimingRating.GREEN:
                             # Crushing Jump Serve line drive (26 m/s)!
-                            self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=26.0)
+                            self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=26.0, hitter=self.player)
                             self.ui.trigger_arcade_popup("ACE JUMP SERVE!!", COLOR_CORAL_ACCENT)
                             self.input_mgr.trigger_rumble(0.9, 1.0, 0.3)
                         elif rating == TimingRating.YELLOW:
-                            # Solid Jump Serve (18.5 m/s)
-                            self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=18.5)
+                            # Solid Jump Serve (19.0 m/s)
+                            self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=19.0, hitter=self.player)
                             self.ui.trigger_arcade_popup("GOOD SERVE", COLOR_GOLD_ACCENT)
                             self.input_mgr.trigger_rumble(0.5, 0.6, 0.2)
                         else:
                             # Mismit
                             rx = target_x + random.uniform(-1.6, 1.6)
                             rz = target_z + random.uniform(-1.6, 1.6)
-                            self.ball.launch_arc(rx, rz, peak_height=4.6)
+                            self.ball.launch_arc(rx, rz, peak_height=4.8, hitter=self.player)
                             self.ui.trigger_arcade_popup("OFF-TIME SERVE", COLOR_CORAL_ACCENT)
 
                         self.match_mgr.register_hit(Team.PLAYER, self.player, "SPIKE")
@@ -386,7 +423,7 @@ class VolleyballGame:
                     # 3. DUMP SERVE: [E]
                     elif self.input_mgr.e_pressed:
                         self.player.trigger_action(PlayerAction.DUMP, 0.35)
-                        self.ball.launch_arc(target_x, 2.0, peak_height=2.7)
+                        self.ball.launch_arc(target_x, 2.0, peak_height=3.2, hitter=self.player)
                         self.match_mgr.register_hit(Team.PLAYER, self.player, "SET")
                         self.ui.trigger_arcade_popup("DUMP SERVE!", COLOR_GOLD_ACCENT)
                         self.match_mgr.state = MatchState.IN_RALLY
@@ -394,19 +431,19 @@ class VolleyballGame:
                     # 4. PASS SERVE: [R-CLICK]
                     elif self.input_mgr.rmb_pressed:
                         self.player.trigger_action(PlayerAction.SET, 0.35)
-                        self.ball.launch_arc(target_x, target_z, peak_height=3.8)
+                        self.ball.launch_arc(target_x, target_z, peak_height=4.8, hitter=self.player)
                         self.match_mgr.register_hit(Team.PLAYER, self.player, "SET")
                         self.ui.trigger_arcade_popup("PASS SERVE", COLOR_CYAN_ACCENT)
                         self.match_mgr.state = MatchState.IN_RALLY
 
             else:
-                # Opponent AI strikes serve
+                # Opponent AI strikes serve with smooth float
                 self.ai_serve_timer -= dt
                 if self.ai_serve_timer <= 0.0:
                     self.opponent_3.trigger_action(PlayerAction.SPIKE, 0.35)
-                    srv_x = random.uniform(-3.0, 3.0)
-                    srv_z = random.uniform(-7.5, -4.0)
-                    self.ball.launch_arc(srv_x, srv_z, peak_height=3.5)
+                    srv_x = random.uniform(-2.8, 2.8)
+                    srv_z = random.uniform(-7.5, -4.5)
+                    self.ball.launch_arc(srv_x, srv_z, peak_height=4.8, hitter=self.opponent_3)
                     self.match_mgr.register_hit(Team.OPPONENT, self.opponent_3, "BUMP")
                     self.match_mgr.state = MatchState.IN_RALLY
 
@@ -455,6 +492,11 @@ class VolleyballGame:
         """Processes precise user actions in rally (Spike, Float, Dump, Bailout, Dig, Set, Roll Dig)."""
         p = self.player
         b = self.ball
+
+        # Ensure contact rules (no double hits, respects contact cooldown)
+        if not b.can_be_hit_by(p):
+            return
+
         horiz_dist = math.sqrt((b.x - p.x) ** 2 + (b.z - p.z) ** 2)
         target_x = self.aim_target_x
         target_z = self.aim_target_z
@@ -465,7 +507,7 @@ class VolleyballGame:
             if self.input_mgr.is_air_bailout_triggered:
                 if horiz_dist < 2.8 and b.y < p.y + 2.5:
                     p.trigger_action(PlayerAction.AIR_BAILOUT, 0.40)
-                    self.ball.launch_arc(target_x, max(2.5, target_z), peak_height=3.6)
+                    self.ball.launch_arc(target_x, max(2.5, target_z), peak_height=4.4, hitter=p)
                     self.match_mgr.register_hit(Team.PLAYER, p, "BUMP")
                     self.ui.trigger_arcade_popup("EMERGENCY TAP!", COLOR_CORAL_ACCENT)
                     self.input_mgr.trigger_rumble(0.5, 0.5, 0.18)
@@ -473,9 +515,9 @@ class VolleyballGame:
 
             # B. In-Air Dump: [E] (Soft feather over block)
             if self.input_mgr.e_pressed:
-                if horiz_dist < 2.0 and abs(b.y - (p.y + 1.5)) < 1.5:
+                if horiz_dist < 2.2 and abs(b.y - (p.y + 1.5)) < 1.6:
                     p.trigger_action(PlayerAction.DUMP, 0.35)
-                    self.ball.launch_arc(target_x, max(1.5, target_z), peak_height=2.7)
+                    self.ball.launch_arc(target_x, max(1.5, target_z), peak_height=3.0, hitter=p)
                     self.match_mgr.register_hit(Team.PLAYER, p, "SET")
                     self.ui.trigger_arcade_popup("DUMP OVER BLOCK!", COLOR_GOLD_ACCENT)
                     self.input_mgr.trigger_rumble(0.3, 0.3, 0.12)
@@ -483,9 +525,9 @@ class VolleyballGame:
 
             # C. In-Air Pass / Set: [R-CLICK]
             if self.input_mgr.rmb_pressed:
-                if horiz_dist < 2.0 and abs(b.y - (p.y + 1.5)) < 1.5:
+                if horiz_dist < 2.2 and abs(b.y - (p.y + 1.5)) < 1.6:
                     p.trigger_action(PlayerAction.SET, 0.35)
-                    self.ball.launch_arc(target_x, target_z, peak_height=3.8)
+                    self.ball.launch_arc(target_x, target_z, peak_height=4.8, hitter=p)
                     self.match_mgr.register_hit(Team.PLAYER, p, "SET")
                     self.ui.trigger_arcade_popup("AIR PASS!", COLOR_CYAN_ACCENT)
                     self.input_mgr.trigger_rumble(0.3, 0.3, 0.12)
@@ -493,26 +535,26 @@ class VolleyballGame:
 
             # D. Power Spike Attack: [L-CLICK] or [SPACE]
             if self.input_mgr.lmb_pressed or self.input_mgr.spike_pressed:
-                if horiz_dist < 2.1 and abs(b.y - (p.y + 1.5)) < 1.5:
+                if horiz_dist < 2.3 and abs(b.y - (p.y + 1.5)) < 1.6:
                     rating = self._evaluate_timing(self.shot_meter_timing)
                     self.ui.trigger_shot_feedback(rating)
                     p.trigger_action(PlayerAction.SPIKE, 0.35)
 
                     if rating == TimingRating.GREEN:
                         # 26 m/s Crushing Power Spike!
-                        self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=26.0)
+                        self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=26.0, hitter=p)
                         self.ui.trigger_arcade_popup("BOOM SPIKE!!", COLOR_CORAL_ACCENT)
                         self.input_mgr.trigger_rumble(0.9, 1.0, 0.3)
                     elif rating == TimingRating.YELLOW:
-                        # Solid 18.5 m/s Spike
-                        self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=18.5)
+                        # Solid 19.0 m/s Spike
+                        self.ball.launch_arc(target_x, target_z, is_spike=True, spike_speed=19.0, hitter=p)
                         self.ui.trigger_arcade_popup("SOLID SPIKE!", COLOR_GOLD_ACCENT)
                         self.input_mgr.trigger_rumble(0.5, 0.6, 0.2)
                     else:
                         # Mismit
                         rx = target_x + random.uniform(-1.8, 1.8)
                         rz = target_z + random.uniform(-1.8, 1.8)
-                        self.ball.launch_arc(rx, rz, peak_height=4.6)
+                        self.ball.launch_arc(rx, rz, peak_height=4.8, hitter=p)
                         self.ui.trigger_arcade_popup("OFF-TIME SPIKE", COLOR_CORAL_ACCENT)
                         self.input_mgr.trigger_rumble(0.3, 0.3, 0.1)
 
@@ -527,11 +569,10 @@ class VolleyballGame:
                     self.ui.trigger_arcade_popup(f"ROLL DIG COOLDOWN ({p.roll_dig_cooldown:.1f}s)", COLOR_CORAL_ACCENT, 0.5)
                     return
                 else:
-                    # Check reach to ball or predicted landing ring
                     dist_to_landing = math.sqrt((self.ball.predict_x - p.x)**2 + (self.ball.predict_z - p.z)**2)
                     if horiz_dist < 3.8 or dist_to_landing < 3.4:
                         p.trigger_action(PlayerAction.ROLL_DIG, 0.60)
-                        self.ball.launch_arc(target_x, target_z, peak_height=4.4)
+                        self.ball.launch_arc(target_x, target_z, peak_height=5.2, hitter=p)
                         self.match_mgr.register_hit(Team.PLAYER, p, "BUMP")
                         self.ui.trigger_arcade_popup("HEROIC ROLL DIG!!", COLOR_GOLD_ACCENT)
                         self.audio_mgr.play("floor_bounce")
@@ -541,9 +582,9 @@ class VolleyballGame:
 
             # B. Setter Dump: [R-CLICK + E]
             if self.input_mgr.is_setter_dump_triggered:
-                if horiz_dist < 2.0 and 1.1 < b.y < 3.2:
+                if horiz_dist < 2.2 and 1.1 < b.y < 3.2:
                     p.trigger_action(PlayerAction.SETTER_DUMP, 0.35)
-                    self.ball.launch_arc(target_x, max(1.6, target_z), peak_height=2.8)
+                    self.ball.launch_arc(target_x, max(1.6, target_z), peak_height=3.0, hitter=p)
                     self.match_mgr.register_hit(Team.PLAYER, p, "SET")
                     self.ui.trigger_arcade_popup("SETTER DUMP!", COLOR_GOLD_ACCENT)
                     self.input_mgr.trigger_rumble(0.4, 0.4, 0.15)
@@ -551,13 +592,13 @@ class VolleyballGame:
 
             # C. Ground Receive / Dig: [L-CTRL] or [bump_pressed]
             if self.input_mgr.ctrl_down or self.input_mgr.bump_pressed:
-                if horiz_dist < 2.0 and 0.2 < b.y < 2.6:
+                if horiz_dist < 2.2 and 0.2 < b.y < 2.8:
                     p.trigger_action(PlayerAction.BUMP, 0.35)
                     if target_z > 0.0:
-                        self.ball.launch_arc(target_x, target_z, peak_height=3.5)
+                        self.ball.launch_arc(target_x, target_z, peak_height=4.6, hitter=p)
                         self.ui.trigger_arcade_popup("OVER THE NET!", COLOR_CYAN_ACCENT)
                     else:
-                        self.ball.launch_arc(target_x, target_z, peak_height=4.2)
+                        self.ball.launch_arc(target_x, target_z, peak_height=5.0, hitter=p)
                         self.ui.trigger_arcade_popup("NICE DIG!", COLOR_CYAN_ACCENT)
 
                     self.match_mgr.register_hit(Team.PLAYER, p, "BUMP")
@@ -566,9 +607,9 @@ class VolleyballGame:
 
             # D. Ground Pass / Set: [R-CLICK] (without ctrl and without e)
             if self.input_mgr.rmb_pressed and not self.input_mgr.ctrl_down:
-                if horiz_dist < 2.0 and 1.3 < b.y < 3.2:
+                if horiz_dist < 2.2 and 1.2 < b.y < 3.2:
                     p.trigger_action(PlayerAction.SET, 0.35)
-                    self.ball.launch_arc(target_x, target_z, peak_height=3.9)
+                    self.ball.launch_arc(target_x, target_z, peak_height=4.8, hitter=p)
                     self.match_mgr.register_hit(Team.PLAYER, p, "SET")
                     self.ui.trigger_arcade_popup("PERFECT SET!", COLOR_CYAN_ACCENT)
                     self.input_mgr.trigger_rumble(0.3, 0.3, 0.12)

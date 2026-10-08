@@ -15,21 +15,21 @@ class CameraController:
     def __init__(self):
         self.mode = self.MODE_BEHIND
         
-        # Camera current vectors (Set to nicely frame full court & baseline server)
+        # Camera current vectors (Comfortable wide angle showing backcourt and baseline)
         self.pos_x = 0.0
-        self.pos_y = 8.2
-        self.pos_z = -17.5
+        self.pos_y = 6.8
+        self.pos_z = -19.2
         
         self.target_x = 0.0
-        self.target_y = 1.6
-        self.target_z = 0.0
+        self.target_y = 1.4
+        self.target_z = 0.5
         
-        # Raylib Camera3D struct (FOV 52.0 for great perspective and full visibility)
+        # Raylib Camera3D struct (FOV 58.0 for spacious court & backcourt visibility)
         self.cam = pr.Camera3D(
             pr.Vector3(self.pos_x, self.pos_y, self.pos_z),
             pr.Vector3(self.target_x, self.target_y, self.target_z),
             pr.Vector3(0.0, 1.0, 0.0),
-            52.0,
+            58.0,
             pr.CAMERA_PERSPECTIVE
         )
 
@@ -41,15 +41,14 @@ class CameraController:
         smooth = 1.0 - math.exp(-7.0 * dt)
         
         if self.mode == self.MODE_BEHIND:
-            # Behind player court looking toward opponent net
-            # Keeps the entire court from Z = -9.5 to Z = +9.5 cleanly in view
-            desired_target_x = player.x * 0.3 + ball.x * 0.3
-            desired_target_y = 1.6 + min(2.5, ball.y * 0.3)
-            desired_target_z = max(-1.5, min(4.0, ball.z * 0.45))
+            # Behind player court: wide view showing baseline, backcourt, and full opponent side
+            desired_target_x = player.x * 0.2 + ball.x * 0.2
+            desired_target_y = 1.4 + min(1.2, ball.y * 0.15)
+            desired_target_z = 0.5
 
-            desired_pos_x = player.x * 0.2
-            desired_pos_y = 8.2 + min(2.0, ball.y * 0.2)
-            desired_pos_z = -17.5
+            desired_pos_x = player.x * 0.15
+            desired_pos_y = 6.8 + min(1.2, ball.y * 0.12)  # Athletic, doesn't climb excessively
+            desired_pos_z = -19.2
 
         elif self.mode == self.MODE_BROADCAST:
             # TV Broadcast sideline view (classic side angle)

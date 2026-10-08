@@ -50,6 +50,7 @@ class Ball:
         self.is_spike = False
         self.flight_time = 0.0
         self.trail = []  # List of (Vector3, color, alpha)
+        self.hit_cooldown = 0.0
 
     def reset(self, x=0.0, y=2.0, z=-7.5, team=None):
         self.x = x
@@ -69,10 +70,24 @@ class Ball:
         self.is_spike = False
         self.flight_time = 0.0
         self.trail.clear()
+        self.hit_cooldown = 0.0
         self.update_prediction()
+
+    def can_be_hit_by(self, char):
+        """Enforces authentic volleyball contact rules:
+        - Prevents multiple hits in rapid succession (minimum cooldown)
+        - Prevents illegal double-contact (same player touching twice consecutively)
+        """
+        if self.hit_cooldown > 0.0:
+            return False
+        if char is not None and char == self.last_touch_player and not self.has_bounced:
+            return False
+        return True
 
     def update(self, dt, audio_mgr=None):
         """Advances physics, updates trajectory, checks floor and net collisions."""
+        if self.hit_cooldown > 0.0:
+            self.hit_cooldown = max(0.0, self.hit_cooldown - dt)
         if not self.in_air:
             return
 
@@ -174,10 +189,11 @@ class Ball:
         self.predict_x = self.x
         self.predict_z = self.z
 
-    def launch_arc(self, target_x, target_z, peak_height=3.8, is_spike=False, is_float=False, spike_speed=22.0):
+    def launch_arc(self, target_x, target_z, peak_height=4.8, is_spike=False, is_float=False, spike_speed=24.0, hitter=None):
         """
         Calculates exact initial velocity vector (vx, vy, vz)
         to arc from current position to (target_x, target_z).
+        Spikes are fast and sharp; passes/sets/bumps are gentle, floaty and readable.
         """
         self.has_bounced = False
         self.in_air = True
@@ -186,36 +202,39 @@ class Ball:
         self.is_float = is_float
         self.flight_time = 0.0
         self.trail.clear()
+        self.hit_cooldown = 0.32  # Prevents multi-frame repeated contact!
+        if hitter is not None:
+            self.last_touch_player = hitter
 
         dx = target_x - self.x
         dz = target_z - self.z
         horiz_dist = math.sqrt(dx * dx + dz * dz)
 
         if is_spike:
-            # Direct downward hammer shot
+            # Downward explosive line-drive hammer shot
             dy = BALL_RADIUS - self.y
-            flight_time = max(0.26, horiz_dist / spike_speed)
+            flight_time = max(0.28, horiz_dist / spike_speed)
             self.vx = dx / flight_time
             self.vz = dz / flight_time
             self.vy = (dy - 0.5 * GRAVITY * (flight_time ** 2)) / flight_time
         elif is_float:
-            # Knuckleball Float Serve: fast, flat, skimming right over net height
+            # Knuckleball Float Serve: fast, flat, skimming over net height
             h = max(NET_HEIGHT + 0.35, max(self.y + 0.2, peak_height * 0.88))
             vy0 = math.sqrt(2 * abs(GRAVITY) * (h - self.y))
             time_up = vy0 / abs(GRAVITY)
             time_down = math.sqrt(2 * abs(GRAVITY) * (h - BALL_RADIUS)) / abs(GRAVITY)
-            total_time = max(0.45, (time_up + time_down) * 0.85)
+            total_time = max(0.55, (time_up + time_down) * 0.85)
 
             self.vx = dx / total_time
             self.vz = dz / total_time
             self.vy = vy0
         else:
-            # Upward parabolic arc
-            h = max(self.y + 0.5, peak_height)
+            # Gentle, lofty parabolic arc (authentic volleyball pass / set / dig)
+            h = max(self.y + 0.6, peak_height)
             vy0 = math.sqrt(2 * abs(GRAVITY) * (h - self.y))
             time_up = vy0 / abs(GRAVITY)
             time_down = math.sqrt(2 * abs(GRAVITY) * (h - BALL_RADIUS)) / abs(GRAVITY)
-            total_time = max(0.4, time_up + time_down)
+            total_time = max(0.70, time_up + time_down)
 
             self.vx = dx / total_time
             self.vz = dz / total_time
