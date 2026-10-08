@@ -23,6 +23,7 @@ class MatchManager:
         self.score_opponent = 0
         self.sets_player = 0
         self.sets_opponent = 0
+        self.current_set = 1
         
         # Rallies and touches
         self.touches_player = 0
@@ -41,6 +42,7 @@ class MatchManager:
         self.score_opponent = 0
         self.sets_player = 0
         self.sets_opponent = 0
+        self.current_set = 1
         self.serving_team = Team.PLAYER
         self.winner = None
         self.start_serve_phase()

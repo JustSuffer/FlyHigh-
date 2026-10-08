@@ -602,13 +602,16 @@ class UIRenderer:
         pr.draw_rectangle_rounded(pr.Rectangle(sub1_x, sub1_y, sub1_w, sub1_h), 0.5, 6, pr.Color(245, 248, 255, 220))
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(sub1_x, sub1_y, sub1_w, sub1_h), 0.5, 6, 1, pr.Color(20, 24, 35, 40))
         # Home set dot
-        pr.draw_circle(sub1_x + 22, sub1_y + 12, 4, pr.Color(60, 215, 110, 255) if match_mgr.sets_player > 0 else pr.Color(180, 190, 200, 255))
+        sets_p = getattr(match_mgr, 'sets_player', 0)
+        sets_o = getattr(match_mgr, 'sets_opponent', 0)
+        c_set = getattr(match_mgr, 'current_set', 1)
+        pr.draw_circle(sub1_x + 22, sub1_y + 12, 4, pr.Color(60, 215, 110, 255) if sets_p > 0 else pr.Color(180, 190, 200, 255))
         # Text "set 1"
-        set_str = f"set {match_mgr.current_set}"
+        set_str = f"set {c_set}"
         stw = self.measure_text(set_str, 12, bold=True)
         self.draw_text(set_str, sub1_x + (sub1_w - stw) // 2, sub1_y + 6, 12, pr.Color(40, 45, 55, 255), bold=True)
         # Away set dot
-        pr.draw_circle(sub1_x + sub1_w - 22, sub1_y + 12, 4, pr.Color(245, 55, 130, 255) if match_mgr.sets_opponent > 0 else pr.Color(180, 190, 200, 255))
+        pr.draw_circle(sub1_x + sub1_w - 22, sub1_y + 12, 4, pr.Color(245, 55, 130, 255) if sets_o > 0 else pr.Color(180, 190, 200, 255))
 
         # Sub-pill 2: 3-Touch Light Indicator ("● ● ●")
         sub2_w = 64
