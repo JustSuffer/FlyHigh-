@@ -66,6 +66,8 @@ class PlayerAction(Enum):
     IDLE = auto()
     RUN = auto()
     JUMP = auto()
+    SERVE_HOLD = auto()   # Ready stance holding ball in hands at baseline
+    SERVE_TOSS = auto()   # Upward toss release animation
     BUMP = auto()         # Bump / Dig / Receive (L-CTRL or Bump)
     SET = auto()          # Overhead Set / Pass (RMB)
     SPIKE = auto()        # Spike Attack / Power Serve (LMB in air)

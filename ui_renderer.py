@@ -43,17 +43,17 @@ COLOR_BTN_HOVER     = pr.Color(45, 60, 95, 255)
 COLOR_BTN_BORDER    = pr.Color(80, 105, 150, 255)
 
 class UIRenderer:
-    # Title Menu Layout
-    CARD_W = 540
-    CARD_H = 550
-    CARD_X = (SCREEN_WIDTH - CARD_W) // 2
-    CARD_Y = 75
+    # Title Menu Layout - Spacious modern arcade design (Zero Overlap)
+    CARD_W = 480
+    CARD_H = 600
+    CARD_X = (SCREEN_WIDTH - 480) // 2
+    CARD_Y = (SCREEN_HEIGHT - 600) // 2
 
-    BTN_W = CARD_W - 70
-    BTN_H = 48
-    BTN_START_Y = 175
-    BTN_SPACING = 58
-    BTN_X = CARD_X + 35
+    BTN_W = 420
+    BTN_H = 50
+    BTN_START_Y = (SCREEN_HEIGHT - 600) // 2 + 162
+    BTN_SPACING = 64
+    BTN_X = (SCREEN_WIDTH - 480) // 2 + 30
 
     def __init__(self):
         # Load high-resolution smooth vector fonts
@@ -308,31 +308,45 @@ class UIRenderer:
         return "NONE", current_diff
 
     def draw_title_screen(self, current_diff, audio_mgr, input_mgr, cam_ctrl=None):
-        """Draws modern Title screen with smooth vector fonts."""
+        """Draws modern Title screen with smooth vector fonts and zero element overlap."""
         card_w = self.CARD_W
         card_h = self.CARD_H
         card_x = self.CARD_X
         card_y = self.CARD_Y
 
-        # Frosted Glass Card Background
-        pr.draw_rectangle_rounded(pr.Rectangle(card_x, card_y, card_w, card_h), 0.12, 10, COLOR_GLASS_BG)
-        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(card_x, card_y, card_w, card_h), 0.12, 10, 2, COLOR_GLASS_BORDER)
+        # Frosted Glass Card Background with Glowing Border
+        pr.draw_rectangle_rounded(pr.Rectangle(card_x, card_y, card_w, card_h), 0.14, 10, COLOR_GLASS_BG)
+        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(card_x, card_y, card_w, card_h), 0.14, 10, 2, COLOR_GLASS_BORDER)
 
-        # Title Header with 3D Drop Shadow
+        # 1. Stylized Mini Volleyball Emblem at Card Top
+        icon_cx = card_x + card_w // 2
+        icon_cy = card_y + 32
+        pr.draw_circle(icon_cx, icon_cy, 14, pr.Color(250, 252, 255, 255))
+        pr.draw_circle_lines(icon_cx, icon_cy, 14, COLOR_GOLD_ACCENT)
+        # Curved seams
+        pr.draw_line(icon_cx - 8, icon_cy - 5, icon_cx + 8, icon_cy + 5, COLOR_CYAN_ACCENT)
+        pr.draw_line(icon_cx - 5, icon_cy + 8, icon_cx + 5, icon_cy - 8, COLOR_GOLD_ACCENT)
+
+        # 2. Title Header with 3D Drop Shadow
         title = "FLYHIGH!"
-        tw = self.measure_text(title, 52, bold=True)
-        self.draw_text(title, card_x + (card_w - tw) // 2 + 2, card_y + 24 + 2, 52, pr.Color(10, 12, 18, 200), bold=True)
-        self.draw_text(title, card_x + (card_w - tw) // 2, card_y + 24, 52, COLOR_CYAN_ACCENT, bold=True)
+        tw = self.measure_text(title, 44, bold=True)
+        # Soft Drop Shadow
+        self.draw_text(title, card_x + (card_w - tw) // 2 + 2, card_y + 54 + 2, 44, pr.Color(10, 12, 18, 220), bold=True)
+        # Foreground Title Text
+        self.draw_text(title, card_x + (card_w - tw) // 2, card_y + 54, 44, COLOR_CYAN_ACCENT, bold=True)
 
-        # Subtitle Tag
+        # 3. Subtitle Badge (Completely separated with clear margin)
         sub = "3v3 ARCADE VOLLEYBALL"
-        sw = self.measure_text(sub, 16, bold=True)
-        tag_bg = pr.Rectangle(card_x + (card_w - sw - 36) // 2, card_y + 86, sw + 36, 28)
-        pr.draw_rectangle_rounded(tag_bg, 0.4, 6, pr.Color(22, 32, 50, 240))
-        pr.draw_rectangle_rounded_lines_ex(tag_bg, 0.4, 6, 1, COLOR_GOLD_ACCENT)
-        self.draw_text(sub, card_x + (card_w - sw) // 2, card_y + 91, 16, COLOR_GOLD_ACCENT, bold=True)
+        sw = self.measure_text(sub, 13, bold=True)
+        tag_w = sw + 32
+        tag_h = 24
+        tag_x = card_x + (card_w - tag_w) // 2
+        tag_y = card_y + 108
+        pr.draw_rectangle_rounded(pr.Rectangle(tag_x, tag_y, tag_w, tag_h), 0.45, 6, pr.Color(20, 28, 44, 240))
+        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(tag_x, tag_y, tag_w, tag_h), 0.45, 6, 1, COLOR_GOLD_ACCENT)
+        self.draw_text(sub, tag_x + 16, tag_y + 4, 13, COLOR_GOLD_ACCENT, bold=True)
 
-        # Menu Buttons
+        # 4. Menu Buttons (Strictly start at BTN_START_Y = card_y + 162, zero overlap)
         for i, item_text in enumerate(self.menu_items):
             by = self.BTN_START_Y + i * self.BTN_SPACING
             is_selected = (i == self.menu_index)
@@ -345,7 +359,7 @@ class UIRenderer:
             pr.draw_rectangle_rounded(rec, 0.35, 8, bg_col)
             pr.draw_rectangle_rounded_lines_ex(rec, 0.35, 8, border_thick, border_col)
 
-            # Button Content (100% English)
+            # Button Content (100% English & cleanly aligned)
             if i == 0:
                 txt = "Play Match (3v3)"
                 tcol = COLOR_GOLD_ACCENT if is_selected else COLOR_TEXT_MAIN
@@ -363,18 +377,21 @@ class UIRenderer:
                 txt = "Quit Game"
                 tcol = COLOR_CORAL_ACCENT if is_selected else COLOR_TEXT_MUTED
 
-            tw_btn = self.measure_text(txt, 18, bold=is_selected)
-            self.draw_text(txt, self.BTN_X + (self.BTN_W - tw_btn) // 2, by + 13, 18, tcol, bold=is_selected)
+            tw_btn = self.measure_text(txt, 17, bold=is_selected)
+            self.draw_text(txt, self.BTN_X + (self.BTN_W - tw_btn) // 2, by + 14, 17, tcol, bold=is_selected)
 
+            # Left Active Accent Pill on selection
             if is_selected:
-                pr.draw_circle(self.BTN_X + 22, by + self.BTN_H // 2, 4, COLOR_GOLD_ACCENT)
-                pr.draw_circle(self.BTN_X + self.BTN_W - 22, by + self.BTN_H // 2, 4, COLOR_GOLD_ACCENT)
+                pr.draw_rectangle_rounded(pr.Rectangle(self.BTN_X + 10, by + 12, 5, 26), 0.5, 4, COLOR_GOLD_ACCENT)
+                pr.draw_circle(self.BTN_X + self.BTN_W - 18, by + self.BTN_H // 2, 4, COLOR_GOLD_ACCENT)
 
-        # Pulsing prompt
-        pulse_alpha = int(180 + 75 * math.sin(self.anim_timer * 5.0))
-        prompt_txt = "Press [Enter], [Space] or Click to Select"
-        pw = self.measure_text(prompt_txt, 14, bold=False)
-        self.draw_text(prompt_txt, card_x + (card_w - pw) // 2, card_y + card_h - 26, 14, pr.Color(255, 215, 0, pulse_alpha), bold=False)
+        # 5. Bottom Navigation Hint Badge
+        hint_y = card_y + card_h - 40
+        hint_txt = "[W / S] Navigate   •   [ENTER] Select   •   [CLICK] Choose"
+        hw = self.measure_text(hint_txt, 13, bold=False)
+        pr.draw_rectangle_rounded(pr.Rectangle(card_x + 30, hint_y - 4, card_w - 60, 26), 0.35, 6, pr.Color(16, 22, 34, 190))
+        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(card_x + 30, hint_y - 4, card_w - 60, 26), 0.35, 6, 1, COLOR_GLASS_BORDER)
+        self.draw_text(hint_txt, card_x + (card_w - hw) // 2, hint_y + 2, 13, COLOR_TEXT_MUTED, bold=False)
 
         # Modals
         if self.show_settings_modal:

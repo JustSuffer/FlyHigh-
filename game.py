@@ -23,7 +23,7 @@ import random
 from constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT, TARGET_FPS, GAME_TITLE,
     Team, MatchState, PlayerAction, AIDifficulty, TimingRating,
-    HALF_WIDTH, HALF_LENGTH, NET_HEIGHT
+    HALF_WIDTH, HALF_LENGTH, NET_HEIGHT, BALL_RADIUS
 )
 from audio_manager import AudioManager
 from input_manager import InputManager
@@ -96,6 +96,7 @@ class VolleyballGame:
         if self.match_mgr.serving_team == Team.PLAYER:
             # User serves at baseline (0.0, -8.2)
             self.player.reset_position(0.0, -8.2)
+            self.player.action = PlayerAction.SERVE_HOLD
             self.teammate_1.reset_position(-2.6, -4.5)
             self.teammate_2.reset_position(2.6, -4.5)
 
@@ -103,12 +104,15 @@ class VolleyballGame:
             self.opponent_2.reset_position(2.4, 4.5)
             self.opponent_3.reset_position(0.0, 7.5)
 
-            # Ball strictly attached to player's hands
-            self.ball.reset(x=self.player.x, y=1.35, z=self.player.z + 0.65, team=Team.PLAYER)
+            # Ball strictly attached to player's hands at chest height
+            fwd_x = math.sin(self.player.facing_angle)
+            fwd_z = math.cos(self.player.facing_angle)
+            self.ball.reset(x=self.player.x + fwd_x * 0.52, y=self.player.y + 1.25, z=self.player.z + fwd_z * 0.52, team=Team.PLAYER)
             self.ball.in_air = False
         else:
             # Opponent Libero (#6) serves at baseline (0.0, 8.2)
             self.opponent_3.reset_position(0.0, 8.2)
+            self.opponent_3.action = PlayerAction.SERVE_HOLD
             self.opponent_1.reset_position(-2.4, 4.5)
             self.opponent_2.reset_position(2.4, 4.5)
 
@@ -116,23 +120,29 @@ class VolleyballGame:
             self.teammate_1.reset_position(-2.6, -4.5)
             self.teammate_2.reset_position(2.6, -4.5)
 
-            # Ball strictly attached to opponent's hands
-            self.ball.reset(x=self.opponent_3.x, y=1.35, z=self.opponent_3.z - 0.65, team=Team.OPPONENT)
+            fwd_x = math.sin(self.opponent_3.facing_angle)
+            fwd_z = math.cos(self.opponent_3.facing_angle)
+            self.ball.reset(x=self.opponent_3.x + fwd_x * 0.52, y=self.opponent_3.y + 1.25, z=self.opponent_3.z + fwd_z * 0.52, team=Team.OPPONENT)
             self.ball.in_air = False
             self.ai_serve_timer = random.uniform(1.2, 1.8)
 
     def run(self):
-        """Main game loop."""
+        """Main game loop with exception guard to prevent unexpected crashes."""
         while not pr.window_should_close():
-            dt = pr.get_frame_time()
-            if dt > 0.05:
-                dt = 0.05
+            try:
+                dt = pr.get_frame_time()
+                if dt > 0.05:
+                    dt = 0.05
 
-            self.handle_input()
-            if not self.is_paused:
-                self.update(dt)
+                self.handle_input()
+                if not self.is_paused:
+                    self.update(dt)
 
-            self.render()
+                self.render()
+            except Exception as e:
+                import traceback
+                print(f"[GAME LOOP ERROR]: {e}")
+                traceback.print_exc()
 
         self.cleanup()
 
@@ -249,10 +259,14 @@ class VolleyballGame:
         # 4. SERVE MECHANICS
         if self.match_mgr.state == MatchState.SERVE_READY:
             if self.match_mgr.serving_team == Team.PLAYER:
-                # Keep ball firmly held in server hands until user deliberately tosses
-                self.ball.x = self.player.x
-                self.ball.y = self.player.y + 1.35
-                self.ball.z = self.player.z + 0.65
+                # Keep ball firmly held in server hands with breathing sway
+                self.player.action = PlayerAction.SERVE_HOLD
+                fwd_x = math.sin(self.player.facing_angle)
+                fwd_z = math.cos(self.player.facing_angle)
+                hold_bob = math.sin(self.player.anim_time * 3.5) * 0.02
+                self.ball.x = self.player.x + fwd_x * 0.52
+                self.ball.y = self.player.y + 1.25 + hold_bob
+                self.ball.z = self.player.z + fwd_z * 0.52
                 self.ball.vx = 0.0
                 self.ball.vy = 0.0
                 self.ball.vz = 0.0
@@ -265,17 +279,22 @@ class VolleyballGame:
                      pr.is_gamepad_button_pressed(self.input_mgr.gamepad_id, pr.GAMEPAD_BUTTON_RIGHT_FACE_UP))
                 )
                 if toss_triggered:
+                    self.player.trigger_action(PlayerAction.SERVE_TOSS, 0.45)
                     self.match_mgr.state = MatchState.SERVE_TOSSED
                     # Toss ball high into the air
-                    self.ball.launch_arc(self.player.x, self.player.z + 0.75, peak_height=4.2)
+                    self.ball.launch_arc(self.player.x, self.player.z + 0.85, peak_height=4.2)
                     self.audio_mgr.play("whistle")
                     self.ui.trigger_arcade_popup("BALL TOSSED! JUMP & HIT!", COLOR_GOLD_ACCENT, 1.0)
             else:
                 # Opponent serving: lock in opponent 3 hands
                 srv = self.opponent_3
-                self.ball.x = srv.x
-                self.ball.y = srv.y + 1.35
-                self.ball.z = srv.z - 0.65
+                srv.action = PlayerAction.SERVE_HOLD
+                fwd_x = math.sin(srv.facing_angle)
+                fwd_z = math.cos(srv.facing_angle)
+                hold_bob = math.sin(srv.anim_time * 3.5) * 0.02
+                self.ball.x = srv.x + fwd_x * 0.52
+                self.ball.y = srv.y + 1.25 + hold_bob
+                self.ball.z = srv.z + fwd_z * 0.52
                 self.ball.vx = 0.0
                 self.ball.vy = 0.0
                 self.ball.vz = 0.0
@@ -283,8 +302,9 @@ class VolleyballGame:
 
                 self.ai_serve_timer -= dt
                 if self.ai_serve_timer <= 0.0:
+                    srv.trigger_action(PlayerAction.SERVE_TOSS, 0.45)
                     self.match_mgr.state = MatchState.SERVE_TOSSED
-                    self.ball.launch_arc(srv.x, srv.z - 0.75, peak_height=4.2)
+                    self.ball.launch_arc(srv.x, srv.z - 0.85, peak_height=4.2)
                     self.audio_mgr.play("whistle")
                     self.ai_serve_timer = 0.55
 

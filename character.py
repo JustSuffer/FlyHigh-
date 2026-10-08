@@ -124,7 +124,8 @@ class Character:
         if self.action_timer > 0.0:
             self.action_timer -= dt
             if self.action_timer <= 0.0 and self.is_grounded:
-                self.action = PlayerAction.IDLE
+                if self.action != PlayerAction.SERVE_HOLD:
+                    self.action = PlayerAction.IDLE
 
         if self.spike_spark_timer > 0.0:
             self.spike_spark_timer -= dt
@@ -320,19 +321,53 @@ class Character:
         # Forehead Bang Tufts
         pr.draw_cylinder(pr.Vector3(px + forward_x * 0.18, head_y + 0.16, pz + forward_z * 0.18), 0.08, 0.02, 0.12, 5, self.color_hair)
 
-        # 10. FLOATING SPHERICAL HANDS (Rayman / Chibi style, exactly as in reference photo!)
-        # 10. FLOATING SPHERICAL HANDS & PROCEDURAL POSES
+        # 10. ATHLETIC ANIME ARMS & PROCEDURAL VOLLEYBALL POSES
         hand_rad = 0.135
         arm_bob = math.sin(self.anim_time * 15.0) * 0.12 if self.action == PlayerAction.RUN else idle_bob * 2.0
         prog = 1.0 - (self.action_timer / max(0.001, self.action_duration)) if self.action_timer > 0.0 else 0.0
 
-        if self.action == PlayerAction.BUMP:
+        # Shoulder attachment points
+        s1 = pr.Vector3(px - right_x * 0.22, base_y + 1.14, pz - right_z * 0.22)
+        s2 = pr.Vector3(px + right_x * 0.22, base_y + 1.14, pz + right_z * 0.22)
+
+        if self.action == PlayerAction.SERVE_HOLD:
+            # Server Stance: Ready crouch holding the ball firmly in both hands
+            hold_bob = math.sin(self.anim_time * 3.5) * 0.02
+            bc_x = px + forward_x * 0.52
+            bc_y = base_y + 1.25 + hold_bob
+            bc_z = pz + forward_z * 0.52
+
+            # Left hand cradling bottom-left of ball
+            h1 = pr.Vector3(bc_x - right_x * 0.20, bc_y - 0.05, bc_z - right_z * 0.20)
+            # Right hand resting on bottom-right of ball
+            h2 = pr.Vector3(bc_x + right_x * 0.20, bc_y - 0.05, bc_z + right_z * 0.20)
+
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
+
+        elif self.action == PlayerAction.SERVE_TOSS:
+            # Dynamic Toss Animation: Hands thrust upward to release ball into air
+            if prog < 0.45:
+                toss_t = prog / 0.45
+                t_y = (base_y + 1.25) + (head_y + 0.48 - (base_y + 1.25)) * math.sin(toss_t * math.pi * 0.5)
+                t_fwd = 0.52 - 0.24 * toss_t
+                h1 = pr.Vector3(px + forward_x * t_fwd - right_x * 0.18, t_y, pz + forward_z * t_fwd - right_z * 0.18)
+                h2 = pr.Vector3(px + forward_x * t_fwd + right_x * 0.18, t_y, pz + forward_z * t_fwd + right_z * 0.18)
+            else:
+                # Follow-through high overhead
+                h1 = pr.Vector3(px + forward_x * 0.28 - right_x * 0.22, head_y + 0.48, pz + forward_z * 0.28 - right_z * 0.22)
+                h2 = pr.Vector3(px + forward_x * 0.28 + right_x * 0.22, head_y + 0.48, pz + forward_z * 0.28 + right_z * 0.22)
+
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
+
+        elif self.action == PlayerAction.BUMP:
             # Bump / Receive (Manşet): Knees deeply bent, hands clasped rigidly in front
             h1 = pr.Vector3(px + forward_x * 0.44 - right_x * 0.07, base_y + 0.80, pz + forward_z * 0.44 - right_z * 0.07)
             h2 = pr.Vector3(px + forward_x * 0.44 + right_x * 0.07, base_y + 0.80, pz + forward_z * 0.44 + right_z * 0.07)
-            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
-            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
-            # Energy link / forearm platform between hands
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
+            # Forearm contact bridge
             pr.draw_cylinder(h1, 0.07, 0.07, 0.14, 6, pr.Color(255, 230, 180, 220))
 
         elif self.action == PlayerAction.SET:
@@ -340,25 +375,23 @@ class Character:
             set_lift = 0.05 * math.sin(prog * math.pi)
             h1 = pr.Vector3(px + forward_x * 0.20 - right_x * 0.19, head_y + 0.30 + set_lift, pz + forward_z * 0.20 - right_z * 0.19)
             h2 = pr.Vector3(px + forward_x * 0.20 + right_x * 0.19, head_y + 0.30 + set_lift, pz + forward_z * 0.20 + right_z * 0.19)
-            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
-            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
 
         elif self.action == PlayerAction.SPIKE:
             # Dynamic Spike Swing: Wind-up -> Explosive downward whip!
             if prog < 0.32:
-                # Wind-up: Right hitting hand cocked back high over shoulder, off hand aiming
                 spike_hand = pr.Vector3(px - forward_x * 0.18 + right_x * 0.30, head_y + 0.42, pz - forward_z * 0.18 + right_z * 0.30)
                 off_hand   = pr.Vector3(px + forward_x * 0.42 - right_x * 0.16, head_y + 0.18, pz + forward_z * 0.42 - right_z * 0.16)
             else:
-                # Power Whip follow-through across the body
                 whip_t = (prog - 0.32) / 0.68
                 sh_fwd = 0.15 + 0.50 * (1.0 - math.cos(whip_t * math.pi * 0.5))
                 sh_h = head_y + 0.42 - 0.70 * whip_t
                 spike_hand = pr.Vector3(px + forward_x * sh_fwd + right_x * (0.30 - 0.45 * whip_t), sh_h, pz + forward_z * sh_fwd + right_z * (0.30 - 0.45 * whip_t))
                 off_hand   = pr.Vector3(px - forward_x * 0.20 - right_x * 0.30, base_y + 0.95, pz - forward_z * 0.20 - right_z * 0.30)
 
-            pr.draw_sphere(spike_hand, hand_rad * 1.18, COLOR_SKIN)
-            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+            self._draw_arm(s1, off_hand, hand_rad, is_right=False)
+            self._draw_arm(s2, spike_hand, hand_rad * 1.18, is_right=True)
 
             if self.spike_spark_timer > 0.0:
                 pr.draw_sphere(spike_hand, hand_rad * 1.5, pr.Color(255, 215, 0, 150))
@@ -368,17 +401,16 @@ class Character:
             # Dump / Soft Tip: Subtle high touch feathering ball over net
             dump_hand = pr.Vector3(px + forward_x * 0.40 + right_x * 0.12, head_y + 0.32, pz + forward_z * 0.40 + right_z * 0.12)
             off_hand  = pr.Vector3(px - forward_x * 0.10 - right_x * 0.28, base_y + 1.05, pz - forward_z * 0.10 - right_z * 0.28)
-            pr.draw_sphere(dump_hand, hand_rad, COLOR_SKIN)
-            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
-            # Soft touch cyan aura
+            self._draw_arm(s1, off_hand, hand_rad, is_right=False)
+            self._draw_arm(s2, dump_hand, hand_rad, is_right=True)
             pr.draw_sphere(dump_hand, hand_rad * 1.3, pr.Color(40, 220, 255, 120))
 
         elif self.action == PlayerAction.SETTER_DUMP:
             # Setter Dump: Deceptive swift push straight over net
             dump_hand = pr.Vector3(px + forward_x * 0.52 + right_x * 0.08, head_y + 0.15, pz + forward_z * 0.52 + right_z * 0.08)
             off_hand  = pr.Vector3(px - forward_x * 0.15 - right_x * 0.25, base_y + 0.95, pz - forward_z * 0.15 - right_z * 0.25)
-            pr.draw_sphere(dump_hand, hand_rad * 1.1, COLOR_SKIN)
-            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+            self._draw_arm(s1, off_hand, hand_rad, is_right=False)
+            self._draw_arm(s2, dump_hand, hand_rad * 1.1, is_right=True)
             pr.draw_sphere(dump_hand, hand_rad * 1.4, pr.Color(255, 215, 0, 130))
 
         elif self.action == PlayerAction.ROLL_DIG:
@@ -387,32 +419,42 @@ class Character:
             reach_dist = 0.55 + 0.35 * math.sin(roll_angle)
             h1 = pr.Vector3(px + forward_x * reach_dist + right_x * 0.12, base_y + 0.20, pz + forward_z * reach_dist + right_z * 0.12)
             h2 = pr.Vector3(px - forward_x * 0.20 - right_x * 0.22, base_y + 0.35, pz - forward_z * 0.20 - right_z * 0.22)
-            pr.draw_sphere(h1, hand_rad * 1.1, COLOR_SKIN)
-            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
-            # Gold speed ring during roll
+            self._draw_arm(s1, h2, hand_rad, is_right=False)
+            self._draw_arm(s2, h1, hand_rad * 1.1, is_right=True)
             pr.draw_circle_3d(pr.Vector3(px, 0.08, pz), 0.7, pr.Vector3(0, 1, 0), 0.0, pr.Color(255, 215, 0, 130))
 
         elif self.action == PlayerAction.AIR_BAILOUT:
             # Emergency Air Bailout: One-hand / foot reach in mid-air
             reach_hand = pr.Vector3(px + forward_x * 0.70 + right_x * 0.10, head_y + 0.40, pz + forward_z * 0.70 + right_z * 0.10)
             off_hand   = pr.Vector3(px - forward_x * 0.30 - right_x * 0.30, base_y + 0.90, pz - forward_z * 0.30 - right_z * 0.30)
-            pr.draw_sphere(reach_hand, hand_rad * 1.1, COLOR_SKIN)
-            pr.draw_sphere(off_hand, hand_rad, COLOR_SKIN)
+            self._draw_arm(s1, off_hand, hand_rad, is_right=False)
+            self._draw_arm(s2, reach_hand, hand_rad * 1.1, is_right=True)
             pr.draw_sphere(reach_hand, hand_rad * 1.4, pr.Color(255, 120, 60, 130))
 
         elif self.action == PlayerAction.CELEBRATE:
             # Celebrate: Hands held high in victory
             h1 = pr.Vector3(px - right_x * 0.36, head_y + 0.32, pz - right_z * 0.36)
             h2 = pr.Vector3(px + right_x * 0.36, head_y + 0.32, pz + right_z * 0.36)
-            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
-            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
 
         else:
-            # Idle & Running: Spheres float playfully beside the hips
-            h1 = pr.Vector3(px - right_x * 0.38 + forward_x * arm_bob, base_y + 0.95 - arm_bob, pz - right_z * 0.38 + forward_z * arm_bob)
-            h2 = pr.Vector3(px + right_x * 0.38 - forward_x * arm_bob, base_y + 0.95 + arm_bob, pz + right_z * 0.38 - forward_z * arm_bob)
-            pr.draw_sphere(h1, hand_rad, COLOR_SKIN)
-            pr.draw_sphere(h2, hand_rad, COLOR_SKIN)
+            # Idle & Running: Arms extend gracefully down to hands beside hips
+            h1 = pr.Vector3(px - right_x * 0.34 + forward_x * arm_bob, base_y + 0.95 - arm_bob, pz - right_z * 0.34 + forward_z * arm_bob)
+            h2 = pr.Vector3(px + right_x * 0.34 - forward_x * arm_bob, base_y + 0.95 + arm_bob, pz + right_z * 0.34 - forward_z * arm_bob)
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
+
+    def _draw_arm(self, shoulder, hand, hand_rad, is_right=False):
+        """Draws athletic character arm connecting shoulder to hand with athletic wristband."""
+        pr.draw_capsule(shoulder, hand, 0.058, 8, 8, COLOR_SKIN)
+        wrist = pr.Vector3(
+            hand.x * 0.74 + shoulder.x * 0.26,
+            hand.y * 0.74 + shoulder.y * 0.26,
+            hand.z * 0.74 + shoulder.z * 0.26
+        )
+        pr.draw_sphere(wrist, 0.074, pr.Color(248, 250, 255, 255))
+        pr.draw_sphere(hand, hand_rad, COLOR_SKIN)
 
     def _draw_digit(self, pos, fwd_x, fwd_z, rt_x, rt_z, digit, col):
         """Draws athletic jersey number in bold 3D geometry on chest."""
