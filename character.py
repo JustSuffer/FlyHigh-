@@ -13,7 +13,7 @@ import pyray as pr
 import math
 from constants import (
     PLAYER_RADIUS, PLAYER_HEIGHT, PLAYER_SPEED, PLAYER_SPRINT_SPEED,
-    PLAYER_JUMP_FORCE, PLAYER_REACH_RADIUS, PLAYER_SPIKE_REACH,
+    PLAYER_JUMP_FORCE, PLAYER_SUPER_JUMP_FORCE, PLAYER_REACH_RADIUS, PLAYER_SPIKE_REACH,
     Team, PlayerAction, GRAVITY
 )
 
@@ -79,6 +79,8 @@ class Character:
         self.action_timer = 0.0
         self.action_duration = 0.35
         self.is_grounded = True
+        self.is_super_jump = False
+        self.jump_charge = 0.0
         self.anim_time = 0.0
         self.roll_dig_cooldown = 0.0
         
@@ -93,18 +95,21 @@ class Character:
         self.vy = 0.0
         self.vz = 0.0
         self.is_grounded = True
+        self.is_super_jump = False
+        self.jump_charge = 0.0
         self.action = PlayerAction.IDLE
         self.action_timer = 0.0
         self.action_duration = 0.35
         self.facing_angle = 0.0 if self.team == Team.PLAYER else math.pi
 
-    def jump(self):
+    def jump(self, is_super=False):
         if self.is_grounded and self.action != PlayerAction.ROLL_DIG:
-            self.vy = PLAYER_JUMP_FORCE
+            self.vy = PLAYER_SUPER_JUMP_FORCE if is_super else PLAYER_JUMP_FORCE
+            self.is_super_jump = is_super
             self.is_grounded = False
             self.action = PlayerAction.JUMP
             self.action_timer = 0.0
-            self.action_duration = 0.35
+            self.action_duration = 0.45 if is_super else 0.35
 
     def trigger_action(self, action, duration=0.35):
         self.action = action
@@ -132,17 +137,34 @@ class Character:
 
         # Movement physics
         move_mag = math.sqrt(move_dir_x * move_dir_x + move_dir_z * move_dir_z)
-        if move_mag > 0.1:
-            speed = PLAYER_SPEED
-            self.vx = (move_dir_x / move_mag) * speed
-            self.vz = (move_dir_z / move_mag) * speed
-            if self.is_grounded and self.action in [PlayerAction.IDLE, PlayerAction.RUN]:
-                self.action = PlayerAction.RUN
+        if not self.is_grounded:
+            if self.is_super_jump:
+                # Reduced mid-air steering / heavy momentum carries you
+                if move_mag > 0.1:
+                    self.vx += (move_dir_x / move_mag) * PLAYER_SPEED * dt * 2.2
+                    self.vz += (move_dir_z / move_mag) * PLAYER_SPEED * dt * 2.2
+                self.vx *= 0.985
+                self.vz *= 0.985
+            else:
+                if move_mag > 0.1:
+                    speed = PLAYER_SPEED
+                    self.vx = (move_dir_x / move_mag) * speed * 0.88
+                    self.vz = (move_dir_z / move_mag) * speed * 0.88
+                else:
+                    self.vx *= 0.88
+                    self.vz *= 0.88
         else:
-            self.vx *= 0.65
-            self.vz *= 0.65
-            if self.is_grounded and self.action == PlayerAction.RUN:
-                self.action = PlayerAction.IDLE
+            if move_mag > 0.1:
+                speed = PLAYER_SPEED
+                self.vx = (move_dir_x / move_mag) * speed
+                self.vz = (move_dir_z / move_mag) * speed
+                if self.action in [PlayerAction.IDLE, PlayerAction.RUN]:
+                    self.action = PlayerAction.RUN
+            else:
+                self.vx *= 0.65
+                self.vz *= 0.65
+                if self.action == PlayerAction.RUN:
+                    self.action = PlayerAction.IDLE
 
         # Jumping physics
         if not self.is_grounded:
@@ -152,6 +174,7 @@ class Character:
                 self.y = 0.0
                 self.vy = 0.0
                 self.is_grounded = True
+                self.is_super_jump = False
                 if self.action == PlayerAction.JUMP:
                     self.action = PlayerAction.IDLE
 
@@ -195,6 +218,12 @@ class Character:
             pr.Vector3(1, 0, 0), 90.0,
             pr.Color(15, 18, 25, shadow_alpha)
         )
+
+        # Super Jump High Leap Aura Ring
+        if self.is_super_jump and not self.is_grounded:
+            glow_pulse = 0.55 + 0.1 * math.sin(self.anim_time * 20.0)
+            pr.draw_circle_3d(pr.Vector3(px, 0.05, pz), glow_pulse, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 220, 60, 160))
+            pr.draw_circle_3d(pr.Vector3(px, py * 0.5, pz), 0.35, pr.Vector3(1, 0, 0), 90.0, pr.Color(80, 220, 255, 120))
 
         # Procedural animation cycles
         run_cycle = math.sin(self.anim_time * 15.0) if self.action == PlayerAction.RUN else 0.0
@@ -437,6 +466,19 @@ class Character:
             h2 = pr.Vector3(px + right_x * 0.36, head_y + 0.32, pz + right_z * 0.36)
             self._draw_arm(s1, h1, hand_rad, is_right=False)
             self._draw_arm(s2, h2, hand_rad, is_right=True)
+
+        elif self.action == PlayerAction.BLOCK:
+            # Block Pose: Hands thrust rigidly upward and slightly forward over net with fingers spread
+            bh_y = head_y + 0.58
+            bh_fwd = 0.28
+            h1 = pr.Vector3(px + forward_x * bh_fwd - right_x * 0.17, bh_y, pz + forward_z * bh_fwd - right_z * 0.17)
+            h2 = pr.Vector3(px + forward_x * bh_fwd + right_x * 0.17, bh_y, pz + forward_z * bh_fwd + right_z * 0.17)
+            self._draw_arm(s1, h1, hand_rad * 1.15, is_right=False)
+            self._draw_arm(s2, h2, hand_rad * 1.15, is_right=True)
+            # Energy blocking shield between palms
+            shield_c = pr.Vector3(px + forward_x * bh_fwd, bh_y, pz + forward_z * bh_fwd)
+            pr.draw_cube(shield_c, 0.65, 0.35, 0.08, pr.Color(60, 220, 255, 150))
+            pr.draw_cube_wires(shield_c, 0.65, 0.35, 0.08, pr.Color(255, 255, 255, 220))
 
         else:
             # Idle & Running: Arms extend gracefully down to hands beside hips

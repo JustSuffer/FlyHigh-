@@ -567,118 +567,124 @@ class UIRenderer:
         if self.arcade_popup_timer > 0.0:
             self.arcade_popup_timer -= dt
 
-        # 1. Top Scoreboard Pill
-        bar_w = 540
-        bar_h = 64
-        bar_x = (SCREEN_WIDTH - bar_w) // 2
-        bar_y = 12
+        # 1. TOP SCOREBOARD PILL (Matching Reference Screenshots)
+        main_w = 320
+        main_h = 48
+        main_x = (SCREEN_WIDTH - main_w) // 2
+        main_y = 14
 
-        pr.draw_rectangle_rounded(pr.Rectangle(bar_x, bar_y, bar_w, bar_h), 0.4, 8, COLOR_GLASS_BG)
-        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(bar_x, bar_y, bar_w, bar_h), 0.4, 8, 2, COLOR_GLASS_BORDER)
+        # Pill background container
+        pr.draw_rectangle_rounded(pr.Rectangle(main_x, main_y, main_w, main_h), 0.5, 8, pr.Color(245, 248, 255, 235))
+        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(main_x, main_y, main_w, main_h), 0.5, 8, 2, pr.Color(20, 24, 35, 60))
 
-        # Team Player (Cyan Pill)
-        pr.draw_rectangle_rounded(pr.Rectangle(bar_x + 14, bar_y + 10, 180, 44), 0.4, 6, pr.Color(20, 60, 110, 200))
-        self.draw_text("YOU (3v3)", bar_x + 28, bar_y + 22, 16, COLOR_CYAN_ACCENT, bold=True)
-        p_score = f"{match_mgr.score_player:02d}"
-        self.draw_text(p_score, bar_x + 140, bar_y + 14, 34, COLOR_CYAN_ACCENT, bold=True)
-        if match_mgr.serving_team == Team.PLAYER:
-            pr.draw_circle(bar_x + 12, bar_y + bar_h // 2, 5, COLOR_GOLD_ACCENT)
+        # Left badge: "home" in lime-green pill
+        hw = 68
+        hh = 34
+        pr.draw_rectangle_rounded(pr.Rectangle(main_x + 8, main_y + 7, hw, hh), 0.5, 6, pr.Color(60, 215, 110, 255))
+        self.draw_text("home", main_x + 20, main_y + 16, 14, pr.Color(255, 255, 255, 255), bold=True)
 
-        # Center Divider & Target
-        self.draw_text("VS", bar_x + bar_w // 2 - 12, bar_y + 14, 18, pr.GRAY, bold=True)
-        target_str = f"TO {match_mgr.points_to_win}"
-        self.draw_text(target_str, bar_x + bar_w // 2 - 22, bar_y + 38, 13, COLOR_GOLD_ACCENT, bold=False)
+        # Center score: "1 - 1" in bold numbers
+        score_str = f"{match_mgr.score_player}  -  {match_mgr.score_opponent}"
+        sw = self.measure_text(score_str, 24, bold=True)
+        self.draw_text(score_str, main_x + (main_w - sw) // 2, main_y + 12, 24, pr.Color(24, 28, 38, 255), bold=True)
 
-        # Team Opponent (Crimson Pill)
-        pr.draw_rectangle_rounded(pr.Rectangle(bar_x + bar_w - 194, bar_y + 10, 180, 44), 0.4, 6, pr.Color(110, 25, 40, 200))
-        o_score = f"{match_mgr.score_opponent:02d}"
-        self.draw_text(o_score, bar_x + bar_w - 180, bar_y + 14, 34, COLOR_CORAL_ACCENT, bold=True)
-        self.draw_text("CPU (3v3)", bar_x + bar_w - 124, bar_y + 22, 16, COLOR_CORAL_ACCENT, bold=True)
-        if match_mgr.serving_team == Team.OPPONENT:
-            pr.draw_circle(bar_x + bar_w - 12, bar_y + bar_h // 2, 5, COLOR_GOLD_ACCENT)
+        # Right badge: "away" in magenta/pink pill
+        aw = 68
+        ah = 34
+        pr.draw_rectangle_rounded(pr.Rectangle(main_x + main_w - aw - 8, main_y + 7, aw, ah), 0.5, 6, pr.Color(245, 55, 130, 255))
+        self.draw_text("away", main_x + main_w - aw + 14, main_y + 16, 14, pr.Color(255, 255, 255, 255), bold=True)
 
-        # 2. Touch Counter Badge
-        if match_mgr.state == MatchState.IN_RALLY:
-            touches = match_mgr.get_touches(Team.PLAYER)
-            badge_w = 250
-            badge_h = 36
-            bx = (SCREEN_WIDTH - badge_w) // 2
-            by = bar_y + bar_h + 10
+        # Sub-pill 1: Set score ("O  O  set 1  O  O")
+        sub1_w = 175
+        sub1_h = 24
+        sub1_x = (SCREEN_WIDTH - sub1_w) // 2
+        sub1_y = main_y + main_h + 4
+        pr.draw_rectangle_rounded(pr.Rectangle(sub1_x, sub1_y, sub1_w, sub1_h), 0.5, 6, pr.Color(245, 248, 255, 220))
+        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(sub1_x, sub1_y, sub1_w, sub1_h), 0.5, 6, 1, pr.Color(20, 24, 35, 40))
+        # Home set dot
+        pr.draw_circle(sub1_x + 22, sub1_y + 12, 4, pr.Color(60, 215, 110, 255) if match_mgr.sets_player > 0 else pr.Color(180, 190, 200, 255))
+        # Text "set 1"
+        set_str = f"set {match_mgr.current_set}"
+        stw = self.measure_text(set_str, 12, bold=True)
+        self.draw_text(set_str, sub1_x + (sub1_w - stw) // 2, sub1_y + 6, 12, pr.Color(40, 45, 55, 255), bold=True)
+        # Away set dot
+        pr.draw_circle(sub1_x + sub1_w - 22, sub1_y + 12, 4, pr.Color(245, 55, 130, 255) if match_mgr.sets_opponent > 0 else pr.Color(180, 190, 200, 255))
 
-            pr.draw_rectangle_rounded(pr.Rectangle(bx, by, badge_w, badge_h), 0.45, 6, COLOR_GLASS_BG)
-            pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(bx, by, badge_w, badge_h), 0.45, 6, 1, COLOR_GLASS_BORDER)
+        # Sub-pill 2: 3-Touch Light Indicator ("● ● ●")
+        sub2_w = 64
+        sub2_h = 22
+        sub2_x = (SCREEN_WIDTH - sub2_w) // 2
+        sub2_y = sub1_y + sub1_h + 4
+        pr.draw_rectangle_rounded(pr.Rectangle(sub2_x, sub2_y, sub2_w, sub2_h), 0.5, 6, pr.Color(245, 248, 255, 220))
+        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(sub2_x, sub2_y, sub2_w, sub2_h), 0.5, 6, 1, pr.Color(20, 24, 35, 40))
 
-            if touches == 0:
-                t_lbl = "TOUCH: 0/3 (READY)"
-                t_col = COLOR_TEXT_MAIN
-            elif touches == 1:
-                t_lbl = "TOUCH: 1/3 (RECEIVE / DIG)"
-                t_col = COLOR_CYAN_ACCENT
-            elif touches == 2:
-                t_lbl = "TOUCH: 2/3 (SET / OVERHEAD)"
-                t_col = COLOR_GOLD_ACCENT
-            else:
-                t_lbl = "TOUCH: 3/3 (SPIKE ATTACK!)"
-                t_col = COLOR_CORAL_ACCENT
+        # Current touches on the team that currently has the ball
+        cur_touches = match_mgr.get_touches(match_mgr.last_touch_team if match_mgr.last_touch_team else Team.PLAYER)
+        c1 = pr.Color(60, 215, 110, 255) if cur_touches >= 1 else pr.Color(190, 195, 205, 180)
+        c2 = pr.Color(255, 205, 40, 255) if cur_touches >= 2 else pr.Color(190, 195, 205, 180)
+        c3 = pr.Color(245, 60, 75, 255) if cur_touches >= 3 else pr.Color(190, 195, 205, 180)
+        pr.draw_circle(sub2_x + 16, sub2_y + 11, 4, c1)
+        pr.draw_circle(sub2_x + 32, sub2_y + 11, 4, c2)
+        pr.draw_circle(sub2_x + 48, sub2_y + 11, 4, c3)
 
-            tw = self.measure_text(t_lbl, 14, bold=True)
-            self.draw_text(t_lbl, bx + (badge_w - tw) // 2, by + 10, 14, t_col, bold=True)
-
-        # 3. Dynamic Arcade Popup Banner
+        # 2. Dynamic Arcade Popup Banner
         if self.arcade_popup_timer > 0.0:
             p_text = self.arcade_popup_text
             pw = self.measure_text(p_text, 36, bold=True)
             p_x = (SCREEN_WIDTH - pw) // 2
-            p_y = 145
+            p_y = 150
             self.draw_text(p_text, p_x + 2, p_y + 2, 36, pr.Color(10, 10, 15, 220), bold=True)
             self.draw_text(p_text, p_x, p_y, 36, self.arcade_popup_col, bold=True)
 
-        # 4. Roll Dig 5-Second Cooldown Badge
+        # 3. Roll Dig 5-Second Cooldown Badge
         cd = player.roll_dig_cooldown
-        cd_w = 195
-        cd_h = 34
+        cd_w = 175
+        cd_h = 32
         cd_x = 24
-        cd_y = SCREEN_HEIGHT - 82
+        cd_y = SCREEN_HEIGHT - 60
 
-        pr.draw_rectangle_rounded(pr.Rectangle(cd_x, cd_y, cd_w, cd_h), 0.35, 6, COLOR_GLASS_BG)
+        pr.draw_rectangle_rounded(pr.Rectangle(cd_x, cd_y, cd_w, cd_h), 0.35, 6, pr.Color(16, 20, 30, 210))
         cd_border = COLOR_CYAN_ACCENT if cd <= 0.0 else COLOR_GLASS_BORDER
         pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(cd_x, cd_y, cd_w, cd_h), 0.35, 6, 1, cd_border)
 
         if cd <= 0.0:
             cd_txt = "ROLL DIG: READY"
-            self.draw_text(cd_txt, cd_x + 12, cd_y + 9, 13, COLOR_CYAN_ACCENT, bold=True)
-            pr.draw_circle(cd_x + cd_w - 18, cd_y + 17, 5, COLOR_GREEN_PERFECT)
+            self.draw_text(cd_txt, cd_x + 12, cd_y + 8, 12, COLOR_CYAN_ACCENT, bold=True)
+            pr.draw_circle(cd_x + cd_w - 18, cd_y + 16, 4, COLOR_GREEN_PERFECT)
         else:
             cd_txt = f"ROLL DIG: {cd:.1f}s"
-            self.draw_text(cd_txt, cd_x + 12, cd_y + 9, 13, COLOR_TEXT_MUTED, bold=False)
+            self.draw_text(cd_txt, cd_x + 12, cd_y + 8, 12, COLOR_TEXT_MUTED, bold=False)
             prog = 1.0 - (cd / ROLL_DIG_COOLDOWN)
-            pr.draw_rectangle(cd_x + cd_w - 55, cd_y + 13, int(40 * prog), 8, COLOR_GOLD_ACCENT)
-            pr.draw_rectangle_lines(cd_x + cd_w - 55, cd_y + 13, 40, 8, COLOR_GLASS_BORDER)
+            pr.draw_rectangle(cd_x + cd_w - 50, cd_y + 12, int(35 * prog), 6, COLOR_GOLD_ACCENT)
 
-        # 5. Bottom Control Helper Bar
-        bot_h = 38
-        bot_y = SCREEN_HEIGHT - bot_h - 8
-        bot_w = SCREEN_WIDTH - 48
-        bot_x = 24
+        # 4. Modern Vertical Control Helper Stack on Right Screen (Matching Reference Image)
+        cw = 170
+        ch = 22
+        controls = [
+            ("camera", "[C] / [TAB]"),
+            ("strafe", "[W][A][S][D]"),
+            ("jump", "[SPACE] (Hold Super)"),
+            ("dive", "[SHIFT] / [L-CTRL+RMB]"),
+            ("set", "[R-CLICK]"),
+            ("spike", "[L-CLICK]"),
+            ("block", "[R-CLICK in air]"),
+            ("tip", "[E]"),
+        ]
+        cy_base = SCREEN_HEIGHT - (len(controls) * 25) - 16
+        cx = SCREEN_WIDTH - cw - 16
 
-        pr.draw_rectangle_rounded(pr.Rectangle(bot_x, bot_y, bot_w, bot_h), 0.35, 6, pr.Color(12, 16, 24, 220))
-        pr.draw_rectangle_rounded_lines_ex(pr.Rectangle(bot_x, bot_y, bot_w, bot_h), 0.35, 6, 1, COLOR_GLASS_BORDER)
+        for idx, (action_name, key_name) in enumerate(controls):
+            item_y = cy_base + idx * 25
+            pr.draw_rectangle_rounded(pr.Rectangle(cx, item_y, cw, ch), 0.35, 4, pr.Color(16, 20, 30, 200))
+            self.draw_text(action_name, cx + 8, item_y + 5, 11, pr.Color(200, 210, 225, 255), bold=False)
+            kw = self.measure_text(key_name, 11, bold=True)
+            self.draw_text(key_name, cx + cw - kw - 6, item_y + 5, 11, COLOR_GOLD_ACCENT, bold=True)
 
-        device = input_mgr.active_device
-        if device == "GAMEPAD":
-            ctrl_str = "Toss: (Y) | Jump: (A) | Spike: (A) | Dump: (X) | Set: (Y) | Dig: (LT) | Roll: (LT+Y)"
-        else:
-            ctrl_str = "Toss: [R-CLICK] | Jump: [SPACE] | Spike: [LMB] | Float: [LMB+E] | Dump: [E] | Dig: [L-CTRL] | Roll Dig: [L-CTRL+RMB]"
-
-        self.draw_text(f"CONTROLS ({device}):", bot_x + 14, bot_y + 11, 13, COLOR_GOLD_ACCENT, bold=True)
-        self.draw_text(ctrl_str, bot_x + 175, bot_y + 11, 13, COLOR_TEXT_MAIN, bold=False)
-
-        # Top-left and Top-right info
-        cam_info = f"CAM: {cam_ctrl.get_mode_name()} [TAB]"
+        # Top-left camera & AI info
+        cam_info = f"CAM: {cam_ctrl.get_mode_name()} [C]"
         self.draw_text(cam_info, 18, 16, 13, COLOR_TEXT_MUTED, bold=False)
         diff_info = f"AI: {ai_difficulty.name}"
-        dw = self.measure_text(diff_info, 13, bold=False)
-        self.draw_text(diff_info, SCREEN_WIDTH - dw - 18, 16, 13, COLOR_TEXT_MUTED, bold=False)
+        self.draw_text(diff_info, 18, 36, 13, COLOR_TEXT_MUTED, bold=False)
 
     def draw_serve_prompt(self, match_mgr, input_mgr):
         """Displays clear serving prompt with explicit RIGHT-CLICK toss instruction."""

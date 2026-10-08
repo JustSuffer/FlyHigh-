@@ -23,7 +23,7 @@ import random
 from constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT, TARGET_FPS, GAME_TITLE,
     Team, MatchState, PlayerAction, AIDifficulty, TimingRating,
-    HALF_WIDTH, HALF_LENGTH, NET_HEIGHT, BALL_RADIUS
+    HALF_WIDTH, HALF_LENGTH, NET_HEIGHT, BALL_RADIUS, BLOCK_REACH_RADIUS
 )
 from audio_manager import AudioManager
 from input_manager import InputManager
@@ -96,15 +96,15 @@ class VolleyballGame:
         """Cleanly positions 3v3 teams with zero overlap and locks ball in server hands."""
         self.serve_toss_timer = 0.0
         if self.match_mgr.serving_team == Team.PLAYER:
-            # User serves at baseline (0.0, -8.2)
-            self.player.reset_position(0.0, -8.2)
+            # User serves at baseline (0.0, -8.8)
+            self.player.reset_position(0.0, -8.8)
             self.player.action = PlayerAction.SERVE_HOLD
-            self.teammate_1.reset_position(-2.6, -4.5)
-            self.teammate_2.reset_position(2.6, -4.5)
+            self.teammate_1.reset_position(-2.6, -4.8)
+            self.teammate_2.reset_position(2.6, -4.8)
 
-            self.opponent_1.reset_position(-2.4, 4.5)
-            self.opponent_2.reset_position(2.4, 4.5)
-            self.opponent_3.reset_position(0.0, 7.5)
+            self.opponent_1.reset_position(-2.4, 4.8)
+            self.opponent_2.reset_position(2.4, 4.8)
+            self.opponent_3.reset_position(0.0, 8.0)
 
             # Ball strictly attached to player's hands at chest height
             fwd_x = math.sin(self.player.facing_angle)
@@ -112,15 +112,15 @@ class VolleyballGame:
             self.ball.reset(x=self.player.x + fwd_x * 0.52, y=self.player.y + 1.25, z=self.player.z + fwd_z * 0.52, team=Team.PLAYER)
             self.ball.in_air = False
         else:
-            # Opponent Libero (#6) serves at baseline (0.0, 8.2)
-            self.opponent_3.reset_position(0.0, 8.2)
+            # Opponent Libero (#6) serves at baseline (0.0, 8.8)
+            self.opponent_3.reset_position(0.0, 8.8)
             self.opponent_3.action = PlayerAction.SERVE_HOLD
-            self.opponent_1.reset_position(-2.4, 4.5)
-            self.opponent_2.reset_position(2.4, 4.5)
+            self.opponent_1.reset_position(-2.4, 4.8)
+            self.opponent_2.reset_position(2.4, 4.8)
 
-            self.player.reset_position(0.0, -7.0)
-            self.teammate_1.reset_position(-2.6, -4.5)
-            self.teammate_2.reset_position(2.6, -4.5)
+            self.player.reset_position(0.0, -7.5)
+            self.teammate_1.reset_position(-2.6, -4.8)
+            self.teammate_2.reset_position(2.6, -4.8)
 
             fwd_x = math.sin(self.opponent_3.facing_angle)
             fwd_z = math.cos(self.opponent_3.facing_angle)
@@ -451,15 +451,27 @@ class VolleyballGame:
         if self.match_mgr.state == MatchState.IN_RALLY:
             self.handle_rally_actions(dt)
 
-        # 6. Human Player Movement
+        # 6. Human Player Movement & Charged Super Jump
         move_x = self.input_mgr.move_x
         move_z = self.input_mgr.move_z
 
-        if self.input_mgr.jump_pressed:
-            self.player.jump()
+        if self.player.is_grounded:
+            if self.input_mgr.jump_down:
+                self.player.jump_charge += dt * 3.6
+            else:
+                self.player.jump_charge = 0.0
 
-        next_px = self.player.x + move_x * dt * 7.5
-        next_pz = self.player.z + move_z * dt * 7.5
+            if self.input_mgr.jump_pressed or (self.player.jump_charge >= 0.70):
+                is_super = (self.player.jump_charge >= 0.40 or (self.input_mgr.jump_down and self.player.jump_charge > 0.15))
+                self.player.jump(is_super=is_super)
+                self.player.jump_charge = 0.0
+                if is_super:
+                    self.ui.trigger_arcade_popup("SUPER JUMP!!", COLOR_GOLD_ACCENT, 0.7)
+                    self.audio_mgr.play("hit_spike")
+                    self.input_mgr.trigger_rumble(0.6, 0.6, 0.2)
+
+        next_px = self.player.x + move_x * dt * 7.8
+        next_pz = self.player.z + move_z * dt * 7.8
         clamped_px, clamped_pz = self.court.clamp_player_position(next_px, next_pz, Team.PLAYER)
         self.player.update(dt, move_x, move_z, look_target=(self.aim_target_x, self.aim_target_z))
         self.player.x = clamped_px
@@ -523,11 +535,43 @@ class VolleyballGame:
                     self.input_mgr.trigger_rumble(0.3, 0.3, 0.12)
                     return
 
-            # C. In-Air Pass / Set: [R-CLICK]
-            if self.input_mgr.rmb_pressed:
-                if horiz_dist < 2.2 and abs(b.y - (p.y + 1.5)) < 1.6:
+            # C. In-Air Block (Near Net: Z > -3.2) OR In-Air Pass / Set (Backcourt): [R-CLICK]
+            if self.input_mgr.rmb_pressed or (self.input_mgr.rmb_down and p.z > -3.2):
+                if p.z > -3.2:
+                    # Player raises hands in BLOCK pose above the net!
+                    p.trigger_action(PlayerAction.BLOCK, 0.45)
+                    bh_x = p.x
+                    bh_y = p.y + 2.15
+                    bh_z = p.z + 0.35
+                    d_block = math.sqrt((b.x - bh_x)**2 + (b.y - bh_y)**2 + (b.z - bh_z)**2)
+
+                    if d_block < BLOCK_REACH_RADIUS and b.can_be_hit_by(p):
+                        self.input_mgr.trigger_rumble(0.8, 0.8, 0.25)
+                        if p.y > 1.05 and b.y > 2.1:
+                            # 1. MONSTER ROOF BLOCK: Direct spike rejection back down into opponent court towards cursor!
+                            tx = target_x
+                            tz = max(2.2, target_z)
+                            self.ball.launch_arc(tx, tz, is_spike=True, spike_speed=21.0, hitter=p)
+                            self.ui.trigger_arcade_popup("MONSTER ROOF BLOCK!!", COLOR_GOLD_ACCENT)
+                            self.audio_mgr.play("hit_spike")
+                        elif abs(b.x - p.x) > 0.55:
+                            # 2. TOOL / BLOCK OUT: Ricochets sideways off fingertips!
+                            tool_x = p.x + (3.4 if b.x > p.x else -3.4)
+                            self.ball.launch_arc(tool_x, 7.5, peak_height=4.6, hitter=p)
+                            self.ui.trigger_arcade_popup("TOOL OFF BLOCK!", COLOR_CORAL_ACCENT)
+                            self.audio_mgr.play("hit_bump")
+                        else:
+                            # 3. SOFT TOUCH: High backward deflection into own court for teammates to dig!
+                            self.ball.launch_arc(p.x + random.uniform(-1.0, 1.0), -6.8, peak_height=5.8, hitter=p)
+                            self.ui.trigger_arcade_popup("SOFT TOUCH! DIG IT UP!", COLOR_CYAN_ACCENT)
+                            self.audio_mgr.play("hit_bump")
+
+                        self.match_mgr.register_hit(Team.PLAYER, p, "BLOCK")
+                        return
+
+                elif horiz_dist < 2.2 and abs(b.y - (p.y + 1.5)) < 1.6:
                     p.trigger_action(PlayerAction.SET, 0.35)
-                    self.ball.launch_arc(target_x, target_z, peak_height=4.8, hitter=p)
+                    self.ball.launch_arc(target_x, target_z, peak_height=5.2, hitter=p)
                     self.match_mgr.register_hit(Team.PLAYER, p, "SET")
                     self.ui.trigger_arcade_popup("AIR PASS!", COLOR_CYAN_ACCENT)
                     self.input_mgr.trigger_rumble(0.3, 0.3, 0.12)
@@ -618,32 +662,69 @@ class VolleyballGame:
     def render(self):
         """Draws 3D stadium, 3v3 characters, ball, reticle, and 2D modern arcade overlays."""
         pr.begin_drawing()
-        pr.clear_background(pr.Color(16, 18, 26, 255))
+        pr.clear_background(pr.Color(135, 206, 250, 255))
 
         # --- 3D Scene ---
         pr.begin_mode_3d(self.cam_ctrl.cam)
 
-        # Court & Stadium
+        # 1. Beach Court & Coastal Arena
         self.court.draw()
 
-        # Render 3v3 Characters
+        # 2. Player Cyan Selection Ring on Sand
+        pr.draw_circle_3d(pr.Vector3(self.player.x, 0.02, self.player.z), 0.58, pr.Vector3(1, 0, 0), 90.0, pr.Color(35, 220, 245, 220))
+        pr.draw_circle_3d(pr.Vector3(self.player.x, 0.025, self.player.z), 0.44, pr.Vector3(1, 0, 0), 90.0, pr.Color(18, 25, 38, 140))
+
+        # 3. Render 3v3 Characters
         for char in self.team_player:
             char.draw()
         for char in self.team_opponent:
             char.draw()
 
-        # Ball, ground shadow & landing ring
+        # 4. Ball, ground shadow & landing ring
         self.ball.draw()
 
-        # CURSOR AIMING RETICLE on Court Floor
+        # 5. DYNAMIC TRAJECTORY BEAM & LANDING TARGET (Matching Reference Image)
+        if self.ball.in_air and not self.ball.has_bounced:
+            pred_pos = pr.Vector3(self.ball.predict_x, 0.03, self.ball.predict_z)
+            ball_pos = pr.Vector3(self.ball.x, self.ball.y, self.ball.z)
+
+            # Red Landing 'X' on the sand
+            x_size = 0.48
+            pr.draw_line_3d(pr.Vector3(pred_pos.x - x_size, 0.03, pred_pos.z - x_size), pr.Vector3(pred_pos.x + x_size, 0.03, pred_pos.z + x_size), pr.Color(245, 55, 65, 230))
+            pr.draw_line_3d(pr.Vector3(pred_pos.x - x_size, 0.03, pred_pos.z + x_size), pr.Vector3(pred_pos.x + x_size, 0.03, pred_pos.z - x_size), pr.Color(245, 55, 65, 230))
+            ripple_rad = 0.45 + 0.15 * math.sin(pr.get_time() * 8.0)
+            pr.draw_circle_3d(pred_pos, ripple_rad, pr.Vector3(1, 0, 0), 90.0, pr.Color(245, 55, 65, 140))
+
+            # Translucent Pink / Magenta Trajectory Ribbon from ball to landing target
+            steps = 14
+            for s in range(steps):
+                t1 = s / steps
+                t2 = (s + 1) / steps
+                p1_x = ball_pos.x + (pred_pos.x - ball_pos.x) * t1
+                p1_y = ball_pos.y * (1.0 - t1) + 0.05
+                p1_z = ball_pos.z + (pred_pos.z - ball_pos.z) * t1
+
+                p2_x = ball_pos.x + (pred_pos.x - ball_pos.x) * t2
+                p2_y = ball_pos.y * (1.0 - t2) + 0.05
+                p2_z = ball_pos.z + (pred_pos.z - ball_pos.z) * t2
+
+                beam_alpha = int(120 + 90 * (1.0 - t1))
+                pr.draw_line_3d(pr.Vector3(p1_x, p1_y, p1_z), pr.Vector3(p2_x, p2_y, p2_z), pr.Color(255, 50, 160, beam_alpha))
+
+            # Floating Touch Count Badge on Trajectory Arc
+            badge_y = max(0.6, ball_pos.y * 0.45)
+            badge_pos = pr.Vector3(ball_pos.x * 0.4 + pred_pos.x * 0.6, badge_y, ball_pos.z * 0.4 + pred_pos.z * 0.6)
+            pr.draw_circle_3d(badge_pos, 0.32, pr.Vector3(0, 1, 0), 0.0, pr.Color(255, 255, 255, 240))
+            pr.draw_circle_3d(badge_pos, 0.32, pr.Vector3(1, 0, 0), 90.0, pr.Color(40, 210, 220, 230))
+
+        # 6. PINK CROSSHAIR AIMING RETICLE (Matching Reference Image)
         if self.match_mgr.state in [MatchState.SERVE_READY, MatchState.SERVE_TOSSED, MatchState.IN_RALLY]:
             ax, az = self.aim_target_x, self.aim_target_z
-            pulse_rad = 0.5 + 0.05 * math.sin(pr.get_time() * 8.0)
-            pr.draw_circle_3d(pr.Vector3(ax, 0.03, az), pulse_rad, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 60, 60, 200))
-            pr.draw_circle_3d(pr.Vector3(ax, 0.035, az), 0.12, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 220, 50, 240))
-            pr.draw_line_3d(pr.Vector3(ax - 0.75, 0.03, az), pr.Vector3(ax + 0.75, 0.03, az), pr.Color(255, 255, 255, 220))
-            pr.draw_line_3d(pr.Vector3(ax, 0.03, az - 0.75), pr.Vector3(ax, 0.03, az + 0.75), pr.Color(255, 255, 255, 220))
-            pr.draw_line_3d(pr.Vector3(self.player.x, 0.1, self.player.z), pr.Vector3(ax, 0.03, az), pr.Color(255, 220, 50, 100))
+            pink_col = pr.Color(255, 45, 145, 255)
+            cs = 0.55
+            pr.draw_line_3d(pr.Vector3(ax - cs, 0.035, az), pr.Vector3(ax + cs, 0.035, az), pink_col)
+            pr.draw_line_3d(pr.Vector3(ax, 0.035, az - cs), pr.Vector3(ax, 0.035, az + cs), pink_col)
+            pr.draw_circle_3d(pr.Vector3(ax, 0.03, az), 0.16, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 45, 145, 120))
 
         pr.end_mode_3d()
 

@@ -24,12 +24,12 @@ class CameraController:
         self.target_y = 1.4
         self.target_z = 0.5
         
-        # Raylib Camera3D struct (FOV 58.0 for spacious court & backcourt visibility)
+        # Raylib Camera3D struct (FOV 60.0 for panoramic coastal beach court visibility)
         self.cam = pr.Camera3D(
             pr.Vector3(self.pos_x, self.pos_y, self.pos_z),
             pr.Vector3(self.target_x, self.target_y, self.target_z),
             pr.Vector3(0.0, 1.0, 0.0),
-            58.0,
+            60.0,
             pr.CAMERA_PERSPECTIVE
         )
 
@@ -41,14 +41,14 @@ class CameraController:
         smooth = 1.0 - math.exp(-7.0 * dt)
         
         if self.mode == self.MODE_BEHIND:
-            # Behind player court: wide view showing baseline, backcourt, and full opponent side
-            desired_target_x = player.x * 0.2 + ball.x * 0.2
-            desired_target_y = 1.4 + min(1.2, ball.y * 0.15)
-            desired_target_z = 0.5
+            # Behind player court: wide view showing baseline, backcourt, and full coastal scene
+            desired_target_x = player.x * 0.15 + ball.x * 0.15
+            desired_target_y = 1.3 + min(1.0, ball.y * 0.10)
+            desired_target_z = 1.2
 
-            desired_pos_x = player.x * 0.15
-            desired_pos_y = 6.8 + min(1.2, ball.y * 0.12)  # Athletic, doesn't climb excessively
-            desired_pos_z = -19.2
+            desired_pos_x = player.x * 0.12
+            desired_pos_y = 6.2 + min(1.2, ball.y * 0.10)
+            desired_pos_z = -18.2
 
         elif self.mode == self.MODE_BROADCAST:
             # TV Broadcast sideline view (classic side angle)

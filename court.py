@@ -1,8 +1,14 @@
 """
 FlyHigh! - 3D Volleyball Game
-Volleyball Court & Stadium Arena Renderer
-Clean arcade low-poly aesthetics inspired by 'Just Volleyball'.
+Beach Volleyball Court & Coastal Arena Renderer
+Sunny arcade beach aesthetic matching the reference screenshots:
+- Golden sand court with vibrant blue boundary lines
+- Sparkling tropical ocean and animated shoreline on the right
+- Palm trees, wooden promenade, and coastal buildings on the left
+- Colorful beach umbrellas, sun loungers, and picnic benches
+- Blue net posts with crisp mesh and red/white striped antennae
 """
+import math
 import pyray as pr
 from constants import (
     COURT_LENGTH, COURT_WIDTH, HALF_LENGTH, HALF_WIDTH,
@@ -11,25 +17,52 @@ from constants import (
     Team
 )
 
-# Color Scheme (Modern International Volleyball Arena)
-COLOR_INNER_COURT = pr.Color(42, 134, 204, 255)    # Vibrant Royal Cyan/Blue
-COLOR_OUTER_COURT = pr.Color(235, 115, 40, 255)    # Warm Terracotta Orange
-COLOR_FLOOR_WOOD  = pr.Color(185, 130, 85, 255)    # Gym floor surrounding
-COLOR_COURT_LINES = pr.Color(255, 255, 255, 255)   # Clean White
-COLOR_ATTACK_LINE = pr.Color(255, 255, 255, 255)
-COLOR_NET_MESH    = pr.Color(25, 25, 25, 160)       # Dark mesh
-COLOR_NET_TAPE    = pr.Color(250, 250, 250, 255)   # Crisp white tape
-COLOR_NET_POST    = pr.Color(60, 65, 75, 255)      # Sturdy steel posts
-COLOR_ANTENNA_RED = pr.Color(230, 40, 40, 255)
-COLOR_ANTENNA_WHT = pr.Color(255, 255, 255, 255)
-COLOR_BLEACHERS   = pr.Color(70, 75, 88, 255)
-COLOR_SEATS_1     = pr.Color(200, 50, 50, 255)
-COLOR_SEATS_2     = pr.Color(50, 100, 200, 255)
-COLOR_WALL        = pr.Color(35, 38, 48, 255)
+# Color Palette: Sunny Tropical Beach
+COLOR_SAND_BASE     = pr.Color(238, 206, 158, 255)  # Warm golden beach sand
+COLOR_SAND_WARM     = pr.Color(245, 218, 172, 255)  # Sunlit sand dunes
+COLOR_SAND_DAMP     = pr.Color(215, 180, 135, 255)  # Moist shoreline sand
+COLOR_COURT_LINES   = pr.Color(35, 120, 245, 255)   # Crisp vibrant beach blue lines
+COLOR_ATTACK_LINES  = pr.Color(50, 140, 250, 230)
+COLOR_OCEAN_SHALLOW = pr.Color(65, 195, 230, 245)   # Turquoise shore water
+COLOR_OCEAN_DEEP    = pr.Color(22, 105, 195, 255)   # Deep tropical azure
+COLOR_OCEAN_FOAM    = pr.Color(255, 255, 255, 230)  # Sparkling wave crests
+COLOR_BOARDWALK     = pr.Color(190, 145, 105, 255)  # Wooden promenade walkway
+COLOR_WOOD_RAIL     = pr.Color(140, 100, 70, 255)
+COLOR_PALM_TRUNK    = pr.Color(140, 95, 58, 255)
+COLOR_PALM_LEAF_1   = pr.Color(55, 165, 65, 255)
+COLOR_PALM_LEAF_2   = pr.Color(75, 190, 80, 255)
+COLOR_NET_POST      = pr.Color(35, 115, 235, 255)   # Vibrant blue steel posts
+COLOR_NET_MESH      = pr.Color(30, 35, 45, 175)     # Dark athletic mesh
+COLOR_NET_TAPE      = pr.Color(250, 252, 255, 255)  # Crisp white tape bands
+COLOR_ANTENNA_RED   = pr.Color(235, 45, 45, 255)
+COLOR_ANTENNA_WHT   = pr.Color(255, 255, 255, 255)
+COLOR_UMBRELLA_RED  = pr.Color(235, 60, 70, 255)
+COLOR_UMBRELLA_BLU  = pr.Color(50, 140, 240, 255)
+COLOR_UMBRELLA_WHT  = pr.Color(250, 250, 250, 255)
 
 class Court:
     def __init__(self):
-        pass
+        # Precomputed palm tree positions along the boardwalk promenade
+        self.palm_positions = [
+            (-15.5, -14.0), (-16.0, -7.0), (-15.5, 0.0),
+            (-16.0, 7.0), (-15.5, 14.0), (-16.2, 21.0), (-16.2, -21.0)
+        ]
+        # City building footprints on the promenade
+        self.buildings = [
+            (-23.0, -18.0, 7.0, 12.0, 7.0, pr.Color(235, 238, 245, 255)),
+            (-24.0, -7.0, 8.0, 16.0, 9.0, pr.Color(185, 210, 235, 255)),
+            (-23.5, 5.0, 7.5, 13.5, 8.0, pr.Color(245, 235, 220, 255)),
+            (-24.5, 17.0, 8.0, 15.0, 9.0, pr.Color(220, 230, 240, 255)),
+        ]
+        # Beach umbrellas and loungers scattered along the shore
+        self.umbrellas = [
+            (11.0, -10.0, COLOR_UMBRELLA_RED),
+            (12.5, -4.0, COLOR_UMBRELLA_BLU),
+            (11.5, 8.0, COLOR_UMBRELLA_RED),
+            (12.0, 14.0, COLOR_UMBRELLA_BLU),
+            (0.0, 18.0, COLOR_UMBRELLA_BLU),
+            (-6.0, 18.5, COLOR_UMBRELLA_RED),
+        ]
 
     def is_in_bounds(self, x, z):
         """Returns True if (x, z) is strictly inside regulation boundary lines."""
@@ -42,136 +75,157 @@ class Court:
         return 0.0 <= z <= HALF_LENGTH
 
     def clamp_player_position(self, x, z, team, allow_freezone=True):
-        """Clamps player inside valid movement zone (can step into freezone but not cross net)."""
-        limit_x = HALF_WIDTH + (2.5 if allow_freezone else 0.0)
+        """Clamps player inside valid movement zone (generous free zone, cannot cross net)."""
+        limit_x = HALF_WIDTH + (4.0 if allow_freezone else 0.0)
         clamped_x = max(-limit_x, min(limit_x, x))
         
         if team == Team.PLAYER:
-            # Player side: Z from (-HALF_LENGTH - 3.5) up to net (-0.25)
-            min_z = -HALF_LENGTH - (3.5 if allow_freezone else 0.0)
-            max_z = -0.28  # Prevent walking through net
+            min_z = -HALF_LENGTH - (5.0 if allow_freezone else 0.0)
+            max_z = -0.28  # Net barrier
             clamped_z = max(min_z, min(max_z, z))
         else:
-            # Opponent side: Z from (+0.25) up to (+HALF_LENGTH + 3.5)
             min_z = 0.28   # Net barrier
-            max_z = HALF_LENGTH + (3.5 if allow_freezone else 0.0)
+            max_z = HALF_LENGTH + (5.0 if allow_freezone else 0.0)
             clamped_z = max(min_z, min(max_z, z))
             
         return clamped_x, clamped_z
 
     def draw(self):
-        """Renders 3D court, lines, net, posts, antennae, and arena stadium."""
-        # 1. Base Gym Arena Floor (Huge surrounding hall)
-        pr.draw_cube(pr.Vector3(0, -0.08, 0), 38.0, 0.1, 46.0, COLOR_WALL)
+        """Renders 3D beach volleyball court, tropical ocean, palm trees, and coastal resort."""
+        t = pr.get_time()
 
-        # 2. Outer Court Border / Free Zone (Orange perimeter)
-        pr.draw_cube(pr.Vector3(0, -0.04, 0), 15.0, 0.04, 25.0, COLOR_OUTER_COURT)
+        # 1. EXPANSIVE GOLDEN SAND BEACH (Extends across the whole scene)
+        pr.draw_cube(pr.Vector3(0, -0.06, 0), 70.0, 0.1, 80.0, COLOR_SAND_BASE)
+        # Gentle sunlit sand mounds
+        pr.draw_cube(pr.Vector3(0, -0.03, 0), 38.0, 0.05, 48.0, COLOR_SAND_WARM)
+        # Slightly darker playing field perimeter
+        pr.draw_cube(pr.Vector3(0, -0.01, 0), COURT_WIDTH + 4.5, 0.03, COURT_LENGTH + 5.5, pr.Color(230, 196, 146, 255))
 
-        # 3. Inner Playing Court (Cyan / Royal Blue)
-        pr.draw_cube(pr.Vector3(0, 0.0, 0), COURT_WIDTH, 0.02, COURT_LENGTH, COLOR_INNER_COURT)
+        # 2. TROPICAL OCEAN & ANIMATED SHORELINE (+X side)
+        wave_offset = math.sin(t * 1.8) * 0.45
+        shore_x = 15.0 + wave_offset
+        # Shallow water shelf
+        pr.draw_cube(pr.Vector3(shore_x + 6.0, -0.02, 0), 12.0, 0.04, 80.0, COLOR_OCEAN_SHALLOW)
+        # Deep ocean plane
+        pr.draw_cube(pr.Vector3(shore_x + 22.0, -0.01, 0), 22.0, 0.05, 80.0, COLOR_OCEAN_DEEP)
+        # Animated white foam wave ribbon
+        pr.draw_cube(pr.Vector3(shore_x, 0.01, 0), 0.75, 0.03, 80.0, COLOR_OCEAN_FOAM)
+        # Secondary rolling wave crest
+        crest_x = shore_x + 7.5 + math.sin(t * 1.2 + 1.5) * 0.6
+        pr.draw_cube(pr.Vector3(crest_x, 0.02, 0), 0.45, 0.03, 80.0, COLOR_OCEAN_FOAM)
 
-        # 4. Court Boundary Lines (0.05m width, elevated slightly to prevent z-fighting)
-        lw = 0.06
-        # Sidelines (X = -4.5 and X = +4.5)
-        pr.draw_cube(pr.Vector3(-HALF_WIDTH, 0.015, 0), lw, 0.02, COURT_LENGTH, COLOR_COURT_LINES)
-        pr.draw_cube(pr.Vector3(HALF_WIDTH, 0.015, 0), lw, 0.02, COURT_LENGTH, COLOR_COURT_LINES)
-        
-        # Endlines / Baselines (Z = -9.0 and Z = +9.0)
-        pr.draw_cube(pr.Vector3(0, 0.015, -HALF_LENGTH), COURT_WIDTH, 0.02, lw, COLOR_COURT_LINES)
-        pr.draw_cube(pr.Vector3(0, 0.015, HALF_LENGTH), COURT_WIDTH, 0.02, lw, COLOR_COURT_LINES)
+        # 3. WOODEN BOARDWALK PROMENADE (-X side)
+        pr.draw_cube(pr.Vector3(-18.5, 0.08, 0), 6.5, 0.16, 80.0, COLOR_BOARDWALK)
+        # Boardwalk edge curbs & safety rails
+        pr.draw_cube(pr.Vector3(-15.2, 0.18, 0), 0.22, 0.32, 80.0, COLOR_WOOD_RAIL)
+        for rz in range(-36, 38, 4):
+            pr.draw_cube(pr.Vector3(-15.2, 0.38, float(rz)), 0.12, 0.45, 0.12, COLOR_WOOD_RAIL)
 
-        # Center Line under net (Z = 0.0)
-        pr.draw_cube(pr.Vector3(0, 0.015, 0), COURT_WIDTH, 0.02, lw * 1.5, COLOR_COURT_LINES)
+        # 4. PALM TREES ALONG PROMENADE
+        for px, pz in self.palm_positions:
+            self._draw_palm_tree(px, pz)
 
-        # Attack Lines (3m from net: Z = -3.0 and Z = +3.0)
-        pr.draw_cube(pr.Vector3(0, 0.015, -ATTACK_LINE_DIST), COURT_WIDTH, 0.02, lw, COLOR_ATTACK_LINE)
-        pr.draw_cube(pr.Vector3(0, 0.015, ATTACK_LINE_DIST), COURT_WIDTH, 0.02, lw, COLOR_ATTACK_LINE)
+        # 5. COASTAL RESORT BUILDINGS & HOTELS
+        for bx, bz, bw, bh, bd, bcol in self.buildings:
+            self._draw_building(bx, bz, bw, bh, bd, bcol)
 
-        # 5. Net Structure
-        # Steel Posts
-        post_rad = 0.08
-        pr.draw_cylinder(pr.Vector3(-POST_DISTANCE, 0, 0), post_rad, post_rad, 2.65, 12, COLOR_NET_POST)
-        pr.draw_cylinder(pr.Vector3(POST_DISTANCE, 0, 0), post_rad, post_rad, 2.65, 12, COLOR_NET_POST)
-        
-        # Top White Band (Y = 2.43)
-        pr.draw_cube(pr.Vector3(0, NET_HEIGHT, 0), NET_WIDTH, 0.09, NET_THICKNESS, COLOR_NET_TAPE)
-        # Bottom White Band (Y = 1.43)
+        # 6. BEACH UMBRELLAS & LOUNGERS
+        for ux, uz, ucol in self.umbrellas:
+            self._draw_beach_umbrella(ux, uz, ucol)
+
+        # 7. COURT BOUNDARY LINES (Crisp Blue Lines on the Sand, matching screenshot)
+        lw = 0.075
+        lh = 0.02
+        # Sidelines (X = -HALF_WIDTH and X = +HALF_WIDTH)
+        pr.draw_cube(pr.Vector3(-HALF_WIDTH, lh, 0), lw, lh, COURT_LENGTH, COLOR_COURT_LINES)
+        pr.draw_cube(pr.Vector3(HALF_WIDTH, lh, 0), lw, lh, COURT_LENGTH, COLOR_COURT_LINES)
+
+        # Baselines (Z = -HALF_LENGTH and Z = +HALF_LENGTH)
+        pr.draw_cube(pr.Vector3(0, lh, -HALF_LENGTH), COURT_WIDTH, lh, lw, COLOR_COURT_LINES)
+        pr.draw_cube(pr.Vector3(0, lh, HALF_LENGTH), COURT_WIDTH, lh, lw, COLOR_COURT_LINES)
+
+        # Center Line directly under the net (Z = 0.0)
+        pr.draw_cube(pr.Vector3(0, lh, 0), COURT_WIDTH, lh, lw * 1.4, COLOR_COURT_LINES)
+
+        # Attack Lines (3.2m from the net: Z = -ATTACK_LINE_DIST and Z = +ATTACK_LINE_DIST)
+        pr.draw_cube(pr.Vector3(0, lh, -ATTACK_LINE_DIST), COURT_WIDTH, lh, lw, COLOR_ATTACK_LINES)
+        pr.draw_cube(pr.Vector3(0, lh, ATTACK_LINE_DIST), COURT_WIDTH, lh, lw, COLOR_ATTACK_LINES)
+
+        # 8. BLUE NET POSTS & VOLLEYBALL NET STRUCTURE
+        post_rad = 0.09
+        # Blue posts on both sides
+        pr.draw_cylinder(pr.Vector3(-POST_DISTANCE, 0, 0), post_rad, post_rad, 2.70, 14, COLOR_NET_POST)
+        pr.draw_cylinder(pr.Vector3(POST_DISTANCE, 0, 0), post_rad, post_rad, 2.70, 14, COLOR_NET_POST)
+
+        # Top White Tape Band (Y = 2.43)
+        pr.draw_cube(pr.Vector3(0, NET_HEIGHT, 0), NET_WIDTH, 0.10, NET_THICKNESS, COLOR_NET_TAPE)
+        # Bottom White Tape Band (Y = 1.43)
         pr.draw_cube(pr.Vector3(0, NET_BOTTOM_HEIGHT, 0), NET_WIDTH, 0.06, NET_THICKNESS, COLOR_NET_TAPE)
 
-        # Net Mesh Grid (Alternating translucent dark mesh strips)
+        # Net Mesh Grid
         mesh_h = NET_HEIGHT - NET_BOTTOM_HEIGHT
         mesh_center_y = (NET_HEIGHT + NET_BOTTOM_HEIGHT) / 2.0
         pr.draw_cube(pr.Vector3(0, mesh_center_y, 0), NET_WIDTH, mesh_h, 0.02, COLOR_NET_MESH)
-        
-        # Thin Net Cables / Ropes across mesh
-        for y_step in range(1, 6):
-            cy = NET_BOTTOM_HEIGHT + (mesh_h * y_step / 6.0)
-            pr.draw_cube(pr.Vector3(0, cy, 0), NET_WIDTH, 0.015, 0.03, pr.Color(150, 150, 150, 180))
 
-        # 6. Antennae (Striped Red & White, at X = -4.5 and +4.5)
+        # Crisp horizontal net cables
+        for step in range(1, 6):
+            cy = NET_BOTTOM_HEIGHT + (mesh_h * step / 6.0)
+            pr.draw_cube(pr.Vector3(0, cy, 0), NET_WIDTH, 0.016, 0.025, pr.Color(160, 165, 175, 200))
+
+        # 9. RED & WHITE STRIPED ANTENNAE
         for ant_x in [-HALF_WIDTH, HALF_WIDTH]:
-            # Extends from bottom of net (1.43) to 80cm above top of net (3.23m)
             total_ant_h = (NET_HEIGHT + ANTENNA_HEIGHT) - NET_BOTTOM_HEIGHT
             segments = 10
             seg_h = total_ant_h / segments
             for s in range(segments):
                 sy = NET_BOTTOM_HEIGHT + s * seg_h + seg_h / 2.0
                 scol = COLOR_ANTENNA_RED if (s % 2 == 0) else COLOR_ANTENNA_WHT
-                pr.draw_cylinder(pr.Vector3(ant_x, sy - seg_h/2.0, 0), 0.02, 0.02, seg_h, 8, scol)
+                pr.draw_cylinder(pr.Vector3(ant_x, sy - seg_h/2.0, 0), 0.022, 0.022, seg_h, 8, scol)
 
-        # 7. Referee Stand (Side of the net at X = -POST_DISTANCE)
-        pr.draw_cube(pr.Vector3(-POST_DISTANCE - 0.6, 1.1, 0), 0.7, 0.1, 0.8, pr.Color(40, 100, 180, 255))
-        pr.draw_cylinder(pr.Vector3(-POST_DISTANCE - 0.6, 0, 0), 0.06, 0.06, 1.1, 8, COLOR_NET_POST)
-        # Referee Ladder rungs
-        for r in range(4):
-            ry = 0.25 * (r + 1)
-            pr.draw_cube(pr.Vector3(-POST_DISTANCE - 0.6, ry, 0), 0.35, 0.04, 0.04, COLOR_NET_POST)
+    def _draw_palm_tree(self, px, pz):
+        """Draws a stylized arcade tropical palm tree."""
+        # Curved trunk segments
+        trunk_h = 5.2
+        pr.draw_cylinder(pr.Vector3(px, 0, pz), 0.22, 0.16, trunk_h, 8, COLOR_PALM_TRUNK)
+        top_y = trunk_h
 
-        # 8. Stadium Bleachers / Stands (North & South ends and Sidelines)
-        # East Stand (+X)
-        self._draw_stands(pr.Vector3(12.5, 0, 0), 4.5, 30.0, 1)
-        # West Stand (-X)
-        self._draw_stands(pr.Vector3(-12.5, 0, 0), 4.5, 30.0, -1)
-        # South Stand (-Z)
-        self._draw_end_stands(pr.Vector3(0, 0, -17.0), 22.0, 4.0)
-        # North Stand (+Z)
-        self._draw_end_stands(pr.Vector3(0, 0, 17.0), 22.0, 4.0)
+        # Palm fronds radiating outwards
+        angles = [0.0, 0.78, 1.57, 2.35, 3.14, 3.92, 4.71, 5.49]
+        for a in angles:
+            frond_len = 2.4
+            fx = px + math.cos(a) * frond_len * 0.5
+            fz = pz + math.sin(a) * frond_len * 0.5
+            fy = top_y + 0.35 - 0.35 * (frond_len * 0.5 / frond_len)
+            col = COLOR_PALM_LEAF_1 if int(a * 10) % 2 == 0 else COLOR_PALM_LEAF_2
+            pr.draw_cube(pr.Vector3(fx, fy, fz), 0.55, 0.08, frond_len, col)
 
-        # Stadium Floodlight Poles
-        self._draw_light_tower(pr.Vector3(-11.0, 0, -14.0))
-        self._draw_light_tower(pr.Vector3(11.0, 0, -14.0))
-        self._draw_light_tower(pr.Vector3(-11.0, 0, 14.0))
-        self._draw_light_tower(pr.Vector3(11.0, 0, 14.0))
+        # Coconut cluster at the top
+        pr.draw_sphere(pr.Vector3(px + 0.12, top_y - 0.1, pz + 0.1), 0.16, pr.Color(90, 60, 35, 255))
+        pr.draw_sphere(pr.Vector3(px - 0.12, top_y - 0.1, pz + 0.1), 0.16, pr.Color(90, 60, 35, 255))
+        pr.draw_sphere(pr.Vector3(px, top_y - 0.1, pz - 0.14), 0.16, pr.Color(90, 60, 35, 255))
 
-    def _draw_stands(self, pos, width, length, dir_x):
-        steps = 5
-        step_h = 0.75
-        step_d = width / steps
-        for i in range(steps):
-            sx = pos.x + dir_x * (i * step_d)
-            sy = (i + 1) * step_h / 2.0
-            sh = (i + 1) * step_h
-            pr.draw_cube(pr.Vector3(sx, sy, pos.z), step_d, sh, length, COLOR_BLEACHERS)
-            # Row of spectator seats on step
-            seat_col = COLOR_SEATS_1 if (i % 2 == 0) else COLOR_SEATS_2
-            pr.draw_cube(pr.Vector3(sx, (i + 1) * step_h + 0.1, pos.z), step_d * 0.7, 0.18, length * 0.95, seat_col)
+    def _draw_building(self, bx, bz, bw, bh, bd, bcol):
+        """Draws a clean low-poly coastal hotel / apartment building with windows."""
+        # Building mass
+        pr.draw_cube(pr.Vector3(bx, bh / 2.0, bz), bw, bh, bd, bcol)
+        # Dark windows along the facade facing the beach (+X side)
+        win_col = pr.Color(40, 55, 80, 220)
+        floors = int(bh / 2.2)
+        cols = int(bd / 2.2)
+        fw_x = bx + bw / 2.0 + 0.02
+        for fl in range(1, floors):
+            wy = fl * 2.2
+            for c in range(cols):
+                wz = bz - bd / 2.0 + 1.2 + c * 2.0
+                pr.draw_cube(pr.Vector3(fw_x, wy, wz), 0.04, 1.1, 1.2, win_col)
 
-    def _draw_end_stands(self, pos, width, depth):
-        steps = 4
-        step_h = 0.8
-        step_d = depth / steps
-        sign = 1 if pos.z > 0 else -1
-        for i in range(steps):
-            sz = pos.z + sign * (i * step_d)
-            sy = (i + 1) * step_h / 2.0
-            sh = (i + 1) * step_h
-            pr.draw_cube(pr.Vector3(pos.x, sy, sz), width, sh, step_d, COLOR_BLEACHERS)
-
-    def _draw_light_tower(self, pos):
-        # Tower pole
-        h = 10.0
-        pr.draw_cylinder(pr.Vector3(pos.x, 0, pos.z), 0.18, 0.12, h, 8, pr.Color(80, 85, 95, 255))
-        # Lamp frame at top
-        pr.draw_cube(pr.Vector3(pos.x, h, pos.z), 1.8, 0.6, 0.5, pr.Color(230, 235, 240, 255))
-        # Bright warm glow box
-        pr.draw_cube(pr.Vector3(pos.x, h - 0.2, pos.z), 1.6, 0.2, 0.4, pr.Color(255, 255, 210, 240))
+    def _draw_beach_umbrella(self, ux, uz, canopy_col):
+        """Draws a striped beach umbrella and sun lounger."""
+        # Wooden pole
+        pr.draw_cylinder(pr.Vector3(ux, 0, uz), 0.04, 0.04, 2.3, 8, COLOR_PALM_TRUNK)
+        # Umbrella cone canopy
+        pr.draw_cylinder(pr.Vector3(ux, 2.1, uz), 1.6, 0.1, 0.45, 12, canopy_col)
+        pr.draw_cylinder(pr.Vector3(ux, 2.2, uz), 1.1, 0.05, 0.40, 12, COLOR_UMBRELLA_WHT)
+        # Sun lounger beside umbrella
+        pr.draw_cube(pr.Vector3(ux + 0.8, 0.12, uz), 0.7, 0.18, 1.6, pr.Color(240, 240, 245, 255))
+        pr.draw_cube(pr.Vector3(ux + 0.8, 0.32, uz - 0.5), 0.7, 0.25, 0.5, canopy_col)

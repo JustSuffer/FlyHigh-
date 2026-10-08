@@ -10,20 +10,19 @@ SCREEN_HEIGHT = 720
 TARGET_FPS = 60
 GAME_TITLE = "FlyHigh! - 3D Volleyball"
 
-# Court Geometry (Standard Volleyball Proportions in Meters)
-# Court is 18m long (Z from -9 to +9), 9m wide (X from -4.5 to +4.5)
-COURT_LENGTH = 18.0
-COURT_WIDTH = 9.0
-HALF_LENGTH = COURT_LENGTH / 2.0  # 9.0m
-HALF_WIDTH = COURT_WIDTH / 2.0    # 4.5m
-ATTACK_LINE_DIST = 3.0            # 3.0m from net
+# Court Geometry (Expanded & Wider for Exciting Arcade Action)
+COURT_LENGTH = 19.0
+COURT_WIDTH = 10.4
+HALF_LENGTH = COURT_LENGTH / 2.0  # 9.5m
+HALF_WIDTH = COURT_WIDTH / 2.0    # 5.2m
+ATTACK_LINE_DIST = 3.2            # 3.2m from net
 
 # Net Specifications
 NET_HEIGHT = 2.43                 # Men's regulation net top height
 NET_BOTTOM_HEIGHT = 1.43          # Bottom tape height (1.0m mesh height)
-NET_WIDTH = 9.5                   # Extends slightly beyond court sidelines
+NET_WIDTH = 11.2                  # Extends beyond expanded court sidelines
 NET_THICKNESS = 0.08
-POST_DISTANCE = 5.2               # Net posts X position (+/- 5.2m)
+POST_DISTANCE = 5.8               # Net posts X position (+/- 5.8m)
 ANTENNA_HEIGHT = 0.8              # Extends 80cm above net
 
 # Ball Physics
@@ -37,11 +36,13 @@ NET_RESTITUTION = 0.35            # Net bounce absorption
 # Player Specifications
 PLAYER_RADIUS = 0.45
 PLAYER_HEIGHT = 1.85
-PLAYER_SPEED = 7.5                # Running speed (m/s)
-PLAYER_SPRINT_SPEED = 10.5        # Dive / Sprint speed
-PLAYER_JUMP_FORCE = 7.4           # Jump velocity (m/s) matching floaty gravity
-PLAYER_REACH_RADIUS = 1.6         # Hit reach sphere
-PLAYER_SPIKE_REACH = 2.1          # Reach in air for spikes
+PLAYER_SPEED = 7.8                # Running speed (m/s)
+PLAYER_SPRINT_SPEED = 10.8        # Dive / Sprint speed
+PLAYER_JUMP_FORCE = 7.4           # Standard jump velocity (m/s)
+PLAYER_SUPER_JUMP_FORCE = 10.5     # Charged Super Jump velocity (clears net height easily!)
+PLAYER_REACH_RADIUS = 1.8         # Hit reach sphere
+PLAYER_SPIKE_REACH = 2.3          # Reach in air for spikes
+BLOCK_REACH_RADIUS = 1.45         # Net block reach radius
 
 # Aiming System
 AIM_OFFSET_MAX_X = 3.8
