@@ -37,21 +37,30 @@ class Character:
         self.name = name
         self.is_ai = is_ai
         
-        # Color Palettes (Photo-inspired: White jersey, Cyan shorts, Blue/Purple shoes)
+        # Customization attributes
+        self.color_skin = COLOR_SKIN
+        self.color_skin_shadow = COLOR_SKIN_SHADOW
+        self.hair_style = 0
+        self.headband_color = pr.Color(250, 252, 255, 255) if team == Team.PLAYER else None
+        self.back_logo = 0 if team == Team.PLAYER else 4
+        self.color_shorts_trim = pr.Color(250, 252, 255, 255) if team == Team.PLAYER else pr.Color(235, 45, 65, 255)
+        self.color_wristband = pr.Color(25, 28, 35, 255) if team == Team.PLAYER else pr.Color(20, 20, 25, 255)
+        
+        # Color Palettes (Photo-inspired: White jersey, Cyan/Black shorts, Blue/Purple shoes)
         if team == Team.PLAYER:
             self.color_jersey = pr.Color(248, 250, 252, 255)    # White Tank Top
             self.color_trim   = pr.Color(25, 28, 35, 255)        # Black Trim
-            self.color_shorts = pr.Color(35, 180, 245, 255)      # Cyan Blue Shorts
+            self.color_shorts = pr.Color(26, 28, 36, 255)        # Midnight Black Shorts
             self.color_shoes  = pr.Color(25, 75, 225, 255)       # Royal Blue Sneakers
             self.color_socks  = pr.Color(115, 55, 235, 255)      # Purple Ankle Cuffs
             self.color_number = pr.Color(18, 20, 25, 255)       # Bold Black Digit
-            # Default hair: Silver/White for captain, or specific color
+            # Default hair: Chestnut Brown (matching reference photo) or Silver
             if hair_color is not None:
                 self.color_hair = hair_color
-            elif jersey_num == 5:
-                self.color_hair = pr.Color(238, 240, 245, 255)   # Silver/White Anime Spikes
+            elif jersey_num == 5 or jersey_num == 7:
+                self.color_hair = pr.Color(95, 60, 42, 255)      # Chestnut Brown Spikes
             elif jersey_num == 2:
-                self.color_hair = pr.Color(50, 40, 35, 255)      # Dark Chestnut Spikes
+                self.color_hair = pr.Color(238, 240, 245, 255)   # Silver/White Anime Spikes
             else:
                 self.color_hair = pr.Color(235, 190, 90, 255)    # Sandy Blonde Spikes
         else:
@@ -86,6 +95,23 @@ class Character:
         
         # Trail & Particle effects on spikes
         self.spike_spark_timer = 0.0
+
+    def apply_profile(self, profile):
+        """Applies player cosmetic choices from PlayerProfile."""
+        self.name = profile.name
+        self.jersey_num = profile.jersey_number
+        skin_c, skin_s = profile.get_skin()
+        self.color_skin = skin_c
+        self.color_skin_shadow = skin_s
+        self.color_hair = profile.get_hair_color()
+        self.hair_style = profile.hair_style_idx
+        self.headband_color = profile.get_headband_color()
+        self.color_jersey = profile.get_jersey_color()
+        self.color_trim = profile.get_jersey_trim()
+        self.back_logo = profile.back_logo_idx
+        self.color_shorts = profile.get_shorts_color()
+        self.color_shorts_trim = profile.get_shorts_trim()
+        self.color_wristband = profile.get_wristband_color()
 
     def reset_position(self, x, z):
         self.x = x
@@ -258,55 +284,66 @@ class Character:
 
         # 3. LEGS & KNEEPADS
         knee_y = base_y + 0.42
-        # Calves (Peach skin)
-        pr.draw_cylinder(pr.Vector3(lf_pos.x, base_y + 0.22, lf_pos.z), 0.07, 0.08, 0.22, 8, COLOR_SKIN)
-        pr.draw_cylinder(pr.Vector3(rf_pos.x, base_y + 0.22, rf_pos.z), 0.07, 0.08, 0.22, 8, COLOR_SKIN)
+        # Calves (Skin tone)
+        pr.draw_cylinder(pr.Vector3(lf_pos.x, base_y + 0.22, lf_pos.z), 0.07, 0.08, 0.22, 8, self.color_skin)
+        pr.draw_cylinder(pr.Vector3(rf_pos.x, base_y + 0.22, rf_pos.z), 0.07, 0.08, 0.22, 8, self.color_skin)
 
         # Black Kneepads (Chunky athletic wraps)
         pr.draw_cylinder(pr.Vector3(lf_pos.x, knee_y, lf_pos.z), 0.11, 0.11, 0.16, 10, COLOR_KNEEPAD)
         pr.draw_cylinder(pr.Vector3(rf_pos.x, knee_y, rf_pos.z), 0.11, 0.11, 0.16, 10, COLOR_KNEEPAD)
 
-        # Thighs (Peach skin up to shorts)
-        pr.draw_cylinder(pr.Vector3(lf_pos.x, knee_y + 0.14, lf_pos.z), 0.08, 0.10, 0.20, 8, COLOR_SKIN)
-        pr.draw_cylinder(pr.Vector3(rf_pos.x, knee_y + 0.14, rf_pos.z), 0.08, 0.10, 0.20, 8, COLOR_SKIN)
+        # Thighs (Skin tone up to shorts)
+        pr.draw_cylinder(pr.Vector3(lf_pos.x, knee_y + 0.14, lf_pos.z), 0.08, 0.10, 0.20, 8, self.color_skin)
+        pr.draw_cylinder(pr.Vector3(rf_pos.x, knee_y + 0.14, rf_pos.z), 0.08, 0.10, 0.20, 8, self.color_skin)
 
-        # 4. VOLLEYBALL SHORTS (Cyan / Bright Blue athletic shorts)
+        # 4. VOLLEYBALL SHORTS (Athletic shorts with trim accents)
         shorts_y = base_y + 0.72
         pr.draw_cylinder(pr.Vector3(px, shorts_y, pz), 0.22, 0.25, 0.28, 12, self.color_shorts)
         # Shorts leg cuffs
         pr.draw_cylinder(pr.Vector3(px - right_x * 0.13, shorts_y - 0.06, pz - right_z * 0.13), 0.12, 0.12, 0.14, 10, self.color_shorts)
         pr.draw_cylinder(pr.Vector3(px + right_x * 0.13, shorts_y - 0.06, pz + right_z * 0.13), 0.12, 0.12, 0.14, 10, self.color_shorts)
+        # Bottom trim border & curved side stripes
+        if self.color_shorts_trim:
+            pr.draw_cylinder(pr.Vector3(px - right_x * 0.13, shorts_y - 0.12, pz - right_z * 0.13), 0.124, 0.124, 0.025, 10, self.color_shorts_trim)
+            pr.draw_cylinder(pr.Vector3(px + right_x * 0.13, shorts_y - 0.12, pz + right_z * 0.13), 0.124, 0.124, 0.025, 10, self.color_shorts_trim)
+            # Athletic side piping stripes along outer thigh (matching reference photo)
+            pr.draw_cylinder(pr.Vector3(px - right_x * 0.22, shorts_y - 0.04, pz - right_z * 0.22), 0.024, 0.024, 0.20, 6, self.color_shorts_trim)
+            pr.draw_cylinder(pr.Vector3(px + right_x * 0.22, shorts_y - 0.04, pz + right_z * 0.22), 0.024, 0.024, 0.20, 6, self.color_shorts_trim)
 
-        # 5. ATHLETIC SLEEVELESS TANK TOP (Contoured athletic waist, white jersey)
+        # 5. ATHLETIC SLEEVELESS TANK TOP (Contoured athletic singlet matching reference photo)
         torso_y = base_y + 1.12
         # Slimmer athletic waist
         pr.draw_cylinder(pr.Vector3(px, base_y + 0.86, pz), 0.20, 0.23, 0.26, 12, self.color_jersey)
         # Upper chest & shoulders
         pr.draw_cylinder(pr.Vector3(px, base_y + 1.05, pz), 0.23, 0.25, 0.30, 12, self.color_jersey)
         
-        # Black border trim along armholes and collar
+        # Border trim along armholes and collar
         pr.draw_cylinder(pr.Vector3(px, base_y + 1.32, pz), 0.14, 0.14, 0.04, 10, self.color_trim)
 
         # JERSEY NUMBER (Rendered on chest)
         num_pos = pr.Vector3(px + forward_x * 0.24, torso_y + 0.05, pz + forward_z * 0.24)
         self._draw_digit(num_pos, forward_x, forward_z, right_x, right_z, self.jersey_num, self.color_number)
 
-        # 6. SLENDER NECK
-        neck_y = base_y + 1.36
-        pr.draw_cylinder(pr.Vector3(px, neck_y, pz), 0.08, 0.08, 0.14, 8, COLOR_SKIN)
+        # BACK EMBLEM (Signature FlyHigh Crown or custom emblem on upper back)
+        if self.back_logo < 4:
+            back_pos = pr.Vector3(px - forward_x * 0.24, torso_y + 0.08, pz - forward_z * 0.24)
+            self._draw_back_emblem(back_pos, forward_x, forward_z, right_x, right_z, self.back_logo, self.color_trim)
 
-        # 7. CHIBI ROUND HEAD (Warm anime peach skin)
+        # 6. SLENDER ATHLETIC NECK
+        neck_y = base_y + 1.36
+        pr.draw_cylinder(pr.Vector3(px, neck_y, pz), 0.08, 0.08, 0.14, 8, self.color_skin)
+
+        # 7. ANIME HEAD & NAPE HAIR VOLUME
         head_y = base_y + 1.62
         head_pos = pr.Vector3(px, head_y, pz)
-        pr.draw_sphere(head_pos, 0.26, COLOR_SKIN)
+        pr.draw_sphere(head_pos, 0.26, self.color_skin)
 
-        # Chibi rounded ears on sides
-        pr.draw_sphere(pr.Vector3(px - right_x * 0.26, head_y - 0.02, pz - right_z * 0.26), 0.08, COLOR_SKIN)
-        pr.draw_sphere(pr.Vector3(px + right_x * 0.26, head_y - 0.02, pz + right_z * 0.26), 0.08, COLOR_SKIN)
+        # Subtle athletic ears tucked behind side hair
+        pr.draw_sphere(pr.Vector3(px - right_x * 0.24, head_y - 0.01, pz - right_z * 0.24), 0.045, self.color_skin)
+        pr.draw_sphere(pr.Vector3(px + right_x * 0.24, head_y - 0.01, pz + right_z * 0.24), 0.045, self.color_skin)
 
         # 8. EXPRESSIVE ANIME FACE (Eyes, eyebrows, nose, mouth)
         face_fwd = 0.24
-        # Left Eye (Almond with dark iris & white highlight)
         le_pos = pr.Vector3(px + forward_x * face_fwd - right_x * 0.08, head_y + 0.03, pz + forward_z * face_fwd - right_z * 0.08)
         re_pos = pr.Vector3(px + forward_x * face_fwd + right_x * 0.08, head_y + 0.03, pz + forward_z * face_fwd + right_z * 0.08)
         
@@ -316,39 +353,65 @@ class Character:
         # Black Iris / Pupil
         pr.draw_sphere(pr.Vector3(le_pos.x + forward_x * 0.02, le_pos.y, le_pos.z + forward_z * 0.02), 0.035, pr.Color(20, 20, 25, 255))
         pr.draw_sphere(pr.Vector3(re_pos.x + forward_x * 0.02, re_pos.y, re_pos.z + forward_z * 0.02), 0.035, pr.Color(20, 20, 25, 255))
-        # White anime sparkle highlight
+        # Sparkle highlight
         pr.draw_sphere(pr.Vector3(le_pos.x + forward_x * 0.035 - right_x * 0.015, le_pos.y + 0.015, le_pos.z + forward_z * 0.035 - right_z * 0.015), 0.012, pr.Color(255, 255, 255, 255))
         pr.draw_sphere(pr.Vector3(re_pos.x + forward_x * 0.035 - right_x * 0.015, re_pos.y + 0.015, re_pos.z + forward_z * 0.035 - right_z * 0.015), 0.012, pr.Color(255, 255, 255, 255))
 
-        # Eyebrows (Arched dark lines)
+        # Eyebrows
         pr.draw_cube(pr.Vector3(le_pos.x, head_y + 0.10, le_pos.z), 0.08, 0.02, 0.02, COLOR_OUTLINE)
         pr.draw_cube(pr.Vector3(re_pos.x, head_y + 0.10, re_pos.z), 0.08, 0.02, 0.02, COLOR_OUTLINE)
 
-        # Small nose dot
-        pr.draw_sphere(pr.Vector3(px + forward_x * (face_fwd + 0.01), head_y - 0.03, pz + forward_z * (face_fwd + 0.01)), 0.018, COLOR_SKIN_SHADOW)
-        # Focused mouth line
+        # Small nose dot & mouth
+        pr.draw_sphere(pr.Vector3(px + forward_x * (face_fwd + 0.01), head_y - 0.03, pz + forward_z * (face_fwd + 0.01)), 0.018, self.color_skin_shadow)
         pr.draw_cube(pr.Vector3(px + forward_x * (face_fwd + 0.01), head_y - 0.09, pz + forward_z * (face_fwd + 0.01)), 0.07, 0.018, 0.02, pr.Color(50, 30, 25, 255))
 
-        # 9. SPIKY ANIME HAIR (Signature Silver/White Jagged Spikes from Reference Photo!)
-        # Back and base volume
-        pr.draw_sphere(pr.Vector3(px - forward_x * 0.05, head_y + 0.10, pz - forward_z * 0.05), 0.25, self.color_hair)
+        # 9. RICH BACK & NAPE HAIR VOLUME (Seamlessly covers back of head down to neck)
+        # Upper & back skull dome
+        pr.draw_sphere(pr.Vector3(px - forward_x * 0.04, head_y + 0.06, pz - forward_z * 0.04), 0.272, self.color_hair)
+        # Nape volume covering lower occipital bone down to neck collar
+        pr.draw_cylinder(pr.Vector3(px - forward_x * 0.08, head_y - 0.04, pz - forward_z * 0.08), 0.22, 0.16, 0.18, 12, self.color_hair)
+        pr.draw_sphere(pr.Vector3(px - forward_x * 0.12, head_y - 0.09, pz - forward_z * 0.12), 0.16, self.color_hair)
+        # Tapered nape hair spikes at the back (visible from behind matching reference photo)
+        pr.draw_cylinder(pr.Vector3(px - forward_x * 0.16, head_y - 0.12, pz - forward_z * 0.16), 0.08, 0.02, 0.16, 6, self.color_hair)
+        pr.draw_cylinder(pr.Vector3(px - forward_x * 0.14 - right_x * 0.07, head_y - 0.10, pz - forward_z * 0.14 - right_z * 0.07), 0.07, 0.02, 0.14, 5, self.color_hair)
+        pr.draw_cylinder(pr.Vector3(px - forward_x * 0.14 + right_x * 0.07, head_y - 0.10, pz - forward_z * 0.14 + right_z * 0.07), 0.07, 0.02, 0.14, 5, self.color_hair)
 
-        # Prominent Upward Spiky Tufts (Crown Horns)
-        # Center Peak Spike
-        pr.draw_cylinder(pr.Vector3(px + forward_x * 0.02, head_y + 0.14, pz + forward_z * 0.02), 0.14, 0.02, 0.26, 6, self.color_hair)
-        # Left Horn Spike (Angled up-left)
-        lh_x = px - right_x * 0.16 + forward_x * 0.04
-        lh_z = pz - right_z * 0.16 + forward_z * 0.04
-        pr.draw_cylinder(pr.Vector3(lh_x, head_y + 0.12, lh_z), 0.13, 0.02, 0.28, 6, self.color_hair)
-        # Right Horn Spike (Angled up-right)
-        rh_x = px + right_x * 0.16 + forward_x * 0.04
-        rh_z = pz + right_z * 0.16 + forward_z * 0.04
-        pr.draw_cylinder(pr.Vector3(rh_x, head_y + 0.12, rh_z), 0.13, 0.02, 0.28, 6, self.color_hair)
-        # Side Cheek Bangs (Framing the face)
-        pr.draw_cylinder(pr.Vector3(px - right_x * 0.22, head_y + 0.02, pz - right_z * 0.22), 0.09, 0.02, 0.18, 5, self.color_hair)
-        pr.draw_cylinder(pr.Vector3(px + right_x * 0.22, head_y + 0.02, pz + right_z * 0.22), 0.09, 0.02, 0.18, 5, self.color_hair)
-        # Forehead Bang Tufts
-        pr.draw_cylinder(pr.Vector3(px + forward_x * 0.18, head_y + 0.16, pz + forward_z * 0.18), 0.08, 0.02, 0.12, 5, self.color_hair)
+        # 10. ATHLETIC HEADBAND (Wrapped around forehead and back hair)
+        if self.headband_color is not None:
+            hb_y = head_y + 0.03
+            pr.draw_cylinder(pr.Vector3(px, hb_y, pz), 0.292, 0.292, 0.075, 24, self.headband_color)
+
+        # 11. SPIKY ANIME HAIR CLUMPS (Stylized 3D hair clumps)
+        if self.hair_style == 0:  # Spiky Crown (Photo Default)
+            # Center Crown Peak
+            pr.draw_cylinder(pr.Vector3(px + forward_x * 0.01, head_y + 0.18, pz + forward_z * 0.01), 0.15, 0.02, 0.32, 6, self.color_hair)
+            # Back-top Spike Clumps (leaning back slightly)
+            pr.draw_cylinder(pr.Vector3(px - forward_x * 0.10, head_y + 0.16, pz - forward_z * 0.10), 0.14, 0.02, 0.28, 6, self.color_hair)
+            pr.draw_cylinder(pr.Vector3(px - forward_x * 0.10 - right_x * 0.11, head_y + 0.14, pz - forward_z * 0.10 - right_z * 0.11), 0.12, 0.02, 0.26, 6, self.color_hair)
+            pr.draw_cylinder(pr.Vector3(px - forward_x * 0.10 + right_x * 0.11, head_y + 0.14, pz - forward_z * 0.10 + right_z * 0.11), 0.12, 0.02, 0.26, 6, self.color_hair)
+            # Left & Right Horn Spikes
+            lh_x = px - right_x * 0.16 + forward_x * 0.04
+            lh_z = pz - right_z * 0.16 + forward_z * 0.04
+            pr.draw_cylinder(pr.Vector3(lh_x, head_y + 0.12, lh_z), 0.13, 0.02, 0.28, 6, self.color_hair)
+            rh_x = px + right_x * 0.16 + forward_x * 0.04
+            rh_z = pz + right_z * 0.16 + forward_z * 0.04
+            pr.draw_cylinder(pr.Vector3(rh_x, head_y + 0.12, rh_z), 0.13, 0.02, 0.28, 6, self.color_hair)
+            # Side Bangs
+            pr.draw_cylinder(pr.Vector3(px - right_x * 0.22, head_y + 0.02, pz - right_z * 0.22), 0.09, 0.02, 0.18, 5, self.color_hair)
+            pr.draw_cylinder(pr.Vector3(px + right_x * 0.22, head_y + 0.02, pz + right_z * 0.22), 0.09, 0.02, 0.18, 5, self.color_hair)
+            # Forehead bangs
+            pr.draw_cylinder(pr.Vector3(px + forward_x * 0.18, head_y + 0.16, pz + forward_z * 0.18), 0.08, 0.02, 0.12, 5, self.color_hair)
+        elif self.hair_style == 1:  # Wild Anime Spikes
+            for ang in [-0.28, -0.14, 0.0, 0.14, 0.28]:
+                sp_x = px + right_x * (ang * 0.8) + forward_x * 0.02
+                sp_z = pz + right_z * (ang * 0.8) + forward_z * 0.02
+                pr.draw_cylinder(pr.Vector3(sp_x, head_y + 0.15, sp_z), 0.11, 0.02, 0.32, 5, self.color_hair)
+        elif self.hair_style == 2:  # Athletic Crop
+            pr.draw_sphere(pr.Vector3(px, head_y + 0.11, pz), 0.27, self.color_hair)
+            pr.draw_cylinder(pr.Vector3(px, head_y + 0.15, pz), 0.16, 0.03, 0.16, 6, self.color_hair)
+        else:  # Swept Flow
+            pr.draw_cylinder(pr.Vector3(px + right_x * 0.10, head_y + 0.14, pz + right_z * 0.10), 0.18, 0.02, 0.26, 6, self.color_hair)
+            pr.draw_cylinder(pr.Vector3(px - right_x * 0.12, head_y + 0.10, pz - right_z * 0.12), 0.14, 0.02, 0.22, 6, self.color_hair)
 
         # 10. ATHLETIC ANIME ARMS & PROCEDURAL VOLLEYBALL POSES
         hand_rad = 0.135
@@ -480,6 +543,33 @@ class Character:
             pr.draw_cube(shield_c, 0.65, 0.35, 0.08, pr.Color(60, 220, 255, 150))
             pr.draw_cube_wires(shield_c, 0.65, 0.35, 0.08, pr.Color(255, 255, 255, 220))
 
+        elif self.action == PlayerAction.MENU_IDLE:
+            # Menu Hero Pose: Standing tall, looking at the court, holding volleyball tucked at right hip!
+            breath = math.sin(self.anim_time * 2.8) * 0.015
+            
+            # Left arm (screen-left) hangs relaxed at the side
+            h2 = pr.Vector3(px + right_x * 0.28, base_y + 0.74 + breath, pz - right_z * 0.28)
+            self._draw_arm(s2, h2, hand_rad * 0.95, is_right=False)
+            
+            # Right arm (screen-right) bent inward, supporting the volleyball against hip
+            vb_pos = pr.Vector3(px - right_x * 0.29, base_y + 0.90 + breath, pz + forward_z * 0.04)
+            h1 = pr.Vector3(vb_pos.x - right_x * 0.03, vb_pos.y - 0.10, vb_pos.z)
+            self._draw_arm(s1, h1, hand_rad * 0.95, is_right=True)
+            
+            # THE VOLLEYBALL HELD UNDER ARM (Mikasa Blue, Yellow, White with Mini Crown Logo matching reference photo)
+            pr.draw_sphere(vb_pos, 0.21, pr.Color(250, 252, 255, 255))
+            # Bold Royal Blue Curved Panel
+            pr.draw_sphere(pr.Vector3(vb_pos.x - 0.04, vb_pos.y + 0.03, vb_pos.z - 0.02), 0.175, pr.Color(25, 80, 225, 255))
+            # Bold Golden Yellow Curved Panel
+            pr.draw_sphere(pr.Vector3(vb_pos.x + 0.04, vb_pos.y - 0.03, vb_pos.z - 0.02), 0.175, pr.Color(255, 215, 0, 255))
+            # Crisp Panel Swirl Seams
+            pr.draw_circle_3d(vb_pos, 0.212, pr.Vector3(0, 1, 0), 40.0, pr.Color(255, 215, 0, 255))
+            pr.draw_circle_3d(vb_pos, 0.212, pr.Vector3(1, 0, 0), 45.0, pr.Color(25, 80, 225, 255))
+            pr.draw_circle_3d(vb_pos, 0.212, pr.Vector3(0, 0, 1), 35.0, pr.Color(255, 255, 255, 255))
+            # Center crown emblem on ball facing camera (-forward_z)
+            pr.draw_circle_3d(pr.Vector3(vb_pos.x, vb_pos.y, vb_pos.z - 0.212), 0.052, pr.Vector3(0, 0, -1), 0.0, pr.Color(20, 25, 35, 255))
+            pr.draw_circle_3d(pr.Vector3(vb_pos.x, vb_pos.y, vb_pos.z - 0.214), 0.026, pr.Vector3(0, 0, -1), 0.0, pr.Color(255, 215, 0, 255))
+
         else:
             # Idle & Running: Arms extend gracefully down to hands beside hips
             h1 = pr.Vector3(px - right_x * 0.34 + forward_x * arm_bob, base_y + 0.95 - arm_bob, pz - right_z * 0.34 + forward_z * arm_bob)
@@ -489,14 +579,45 @@ class Character:
 
     def _draw_arm(self, shoulder, hand, hand_rad, is_right=False):
         """Draws athletic character arm connecting shoulder to hand with athletic wristband."""
-        pr.draw_capsule(shoulder, hand, 0.058, 8, 8, COLOR_SKIN)
+        pr.draw_capsule(shoulder, hand, 0.058, 8, 8, self.color_skin)
         wrist = pr.Vector3(
             hand.x * 0.74 + shoulder.x * 0.26,
             hand.y * 0.74 + shoulder.y * 0.26,
             hand.z * 0.74 + shoulder.z * 0.26
         )
-        pr.draw_sphere(wrist, 0.074, pr.Color(248, 250, 255, 255))
-        pr.draw_sphere(hand, hand_rad, COLOR_SKIN)
+        if self.color_wristband is not None:
+            pr.draw_cylinder(wrist, 0.076, 0.076, 0.05, 8, self.color_wristband)
+        else:
+            pr.draw_sphere(wrist, 0.074, pr.Color(248, 250, 255, 255))
+        pr.draw_sphere(hand, hand_rad, self.color_skin)
+
+    def _draw_back_emblem(self, pos, fwd_x, fwd_z, rt_x, rt_z, logo_id, col):
+        """Draws stylized logo on upper back of the jersey (FlyHigh Crown, Wings, etc.)."""
+        if logo_id == 0:  # FlyHigh Crown Emblem (Signature from reference image)
+            # Center Crown Peak (tallest)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.042, pos.z), 0.034, 0.09, 0.02, col)
+            # Left Crown Peak (angled)
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.048, pos.y + 0.032, pos.z - rt_z * 0.048), 0.028, 0.076, 0.02, col)
+            # Right Crown Peak (angled)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.048, pos.y + 0.032, pos.z + rt_z * 0.048), 0.028, 0.076, 0.02, col)
+            # Connecting web chevrons
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.025, pos.y + 0.005, pos.z - rt_z * 0.025), 0.026, 0.04, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.025, pos.y + 0.005, pos.z + rt_z * 0.025), 0.026, 0.04, 0.02, col)
+            # Solid Base Band
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.028, pos.z), 0.125, 0.028, 0.02, col)
+            # Bottom Point / V-Crest
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.052, pos.z), 0.038, 0.028, 0.02, col)
+        elif logo_id == 1:  # Angel Wings
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.03, 0.08, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.06, pos.y + 0.02, pos.z - rt_z * 0.06), 0.08, 0.03, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.06, pos.y + 0.02, pos.z + rt_z * 0.06), 0.08, 0.03, 0.02, col)
+        elif logo_id == 2:  # Flame
+            pr.draw_cube(pr.Vector3(pos.x, pos.y + 0.03, pos.z), 0.04, 0.10, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y - 0.04, pos.z), 0.09, 0.04, 0.02, col)
+        elif logo_id == 3:  # Lightning
+            pr.draw_cube(pr.Vector3(pos.x - rt_x * 0.025, pos.y + 0.04, pos.z - rt_z * 0.025), 0.035, 0.07, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x, pos.y, pos.z), 0.08, 0.03, 0.02, col)
+            pr.draw_cube(pr.Vector3(pos.x + rt_x * 0.025, pos.y - 0.04, pos.z + rt_z * 0.025), 0.035, 0.07, 0.02, col)
 
     def _draw_digit(self, pos, fwd_x, fwd_z, rt_x, rt_z, digit, col):
         """Draws athletic jersey number in bold 3D geometry on chest."""

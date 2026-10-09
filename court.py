@@ -42,10 +42,11 @@ COLOR_UMBRELLA_WHT  = pr.Color(250, 250, 250, 255)
 
 class Court:
     def __init__(self):
-        # Precomputed palm tree positions along the boardwalk promenade
+        # Precomputed palm tree positions along the boardwalk and tropical beach shoreline
         self.palm_positions = [
             (-15.5, -14.0), (-16.0, -7.0), (-15.5, 0.0),
-            (-16.0, 7.0), (-15.5, 14.0), (-16.2, 21.0), (-16.2, -21.0)
+            (-16.0, 7.0), (-15.5, 14.0), (-16.2, 21.0), (-16.2, -21.0),
+            (14.5, 16.0), (16.0, 6.0), (15.0, -8.0)
         ]
         # City building footprints on the promenade
         self.buildings = [
@@ -93,6 +94,12 @@ class Court:
     def draw(self):
         """Renders 3D beach volleyball court, tropical ocean, palm trees, and coastal resort."""
         t = pr.get_time()
+
+        # Golden Hour Beach Sun & Tropical Sky Glow (Matching reference photo)
+        pr.draw_sphere(pr.Vector3(-22.0, 15.0, 42.0), 4.6, pr.Color(255, 245, 215, 255))
+        pr.draw_sphere(pr.Vector3(-22.0, 15.0, 42.0), 8.2, pr.Color(255, 220, 140, 90))
+        # Warm golden-hour horizon haze
+        pr.draw_cube(pr.Vector3(0, 3.5, 46.0), 90.0, 7.0, 1.5, pr.Color(255, 215, 160, 45))
 
         # 1. EXPANSIVE GOLDEN SAND BEACH (Extends across the whole scene)
         pr.draw_cube(pr.Vector3(0, -0.06, 0), 70.0, 0.1, 80.0, COLOR_SAND_BASE)

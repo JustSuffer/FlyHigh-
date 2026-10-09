@@ -34,6 +34,7 @@ from ai_controller import TeamAIController
 from camera_controller import CameraController
 from match_manager import MatchManager
 from ui_renderer import UIRenderer, COLOR_CYAN_ACCENT, COLOR_GOLD_ACCENT, COLOR_CORAL_ACCENT, COLOR_GREEN_PERFECT
+from player_customization import PlayerProfile
 
 class VolleyballGame:
     def __init__(self):
@@ -52,10 +53,16 @@ class VolleyballGame:
         self.ui = UIRenderer()
         self.ai_diff = AIDifficulty.MEDIUM
 
+        # Player Career Profile & Custom Cosmetics
+        self.profile = PlayerProfile()
+        self.match_stats_recorded = False
+
         # --- 3v3 ROSTERS ---
         # 1. Team Player (Near Court, Z < 0)
-        # Captain #5 (User Player)
-        self.player = Character(x=0.0, z=-8.2, team=Team.PLAYER, jersey_num=5, name="CAPTAIN", is_ai=False)
+        # Captain (User Player, initialized with custom profile)
+        self.player = Character(x=0.0, z=-8.2, team=Team.PLAYER, jersey_num=self.profile.jersey_number, name=self.profile.name, is_ai=False)
+        self.player.apply_profile(self.profile)
+
         # Teammate 1: Setter #2
         self.teammate_1 = Character(x=-2.6, z=-4.5, team=Team.PLAYER, jersey_num=2, name="SETTER", is_ai=True)
         # Teammate 2: Wing / Blocker #4
@@ -95,6 +102,9 @@ class VolleyballGame:
     def setup_serve(self):
         """Cleanly positions 3v3 teams with zero overlap and locks ball in server hands."""
         self.serve_toss_timer = 0.0
+        self.match_stats_recorded = False
+        self.player.apply_profile(self.profile)
+
         if self.match_mgr.serving_team == Team.PLAYER:
             # User serves at baseline (0.0, -8.8)
             self.player.reset_position(0.0, -8.8)
@@ -153,7 +163,7 @@ class VolleyballGame:
 
         # Title / Settings Menu Navigation
         if self.match_mgr.state == MatchState.TITLE_SCREEN:
-            action, new_diff = self.ui.update_menu(self.input_mgr, self.audio_mgr, self.ai_diff, self.cam_ctrl)
+            action, new_diff = self.ui.update_menu(self.input_mgr, self.audio_mgr, self.ai_diff, self.cam_ctrl, self.profile, self.player)
             if new_diff != self.ai_diff:
                 self.ai_diff = new_diff
                 self.player_ai_mgr.set_difficulty(new_diff)
@@ -161,6 +171,7 @@ class VolleyballGame:
 
             if action == "PLAY":
                 self.audio_mgr.play("whistle")
+                self.player.apply_profile(self.profile)
                 self.match_mgr.reset_match()
                 self.setup_serve()
             elif action == "QUIT":
@@ -212,17 +223,40 @@ class VolleyballGame:
     def update(self, dt):
         """Updates game state, cursor raycasting, 3v3 characters, ball physics, and rules."""
         if self.match_mgr.state == MatchState.TITLE_SCREEN:
-            # Orbiting camera in title menu
-            self.menu_cam_angle += dt * 0.25
-            cam_dist = 16.0
-            cx = cam_dist * math.sin(self.menu_cam_angle)
-            cz = cam_dist * math.cos(self.menu_cam_angle)
-            self.cam_ctrl.cam.position = pr.Vector3(cx, 6.8, cz)
-            self.cam_ctrl.cam.target = pr.Vector3(0.0, 1.8, 0.0)
+            # Menu Hero Pose: Positioned at sand center looking forward towards the net
+            self.player.x = 0.05
+            self.player.y = 0.0
+            self.player.z = -2.6
+            self.player.action = PlayerAction.MENU_IDLE
+            self.player.anim_time += dt
 
-            for c in self.team_player + self.team_opponent:
-                c.update(dt, 0.0, 0.0, look_target=(0.0, 0.0))
+            # Camera framing matching reference screenshot:
+            # Positioned behind player looking forward past player to net and horizon
+            if not self.ui.show_customize_modal:
+                self.cam_ctrl.cam.position = pr.Vector3(-0.20, 1.40, -4.75)
+                self.cam_ctrl.cam.target = pr.Vector3(0.06, 1.50, 2.0)
+            else:
+                # Customization camera: focused close on character for 360 styling
+                self.cam_ctrl.cam.position = pr.Vector3(0.05, 1.35, -5.2)
+                self.cam_ctrl.cam.target = pr.Vector3(0.05, 1.15, -2.6)
             return
+
+        # Record Career Stats on Match Over
+        if self.match_mgr.state == MatchState.MATCH_OVER and not self.match_stats_recorded:
+            self.match_stats_recorded = True
+            self.profile.matches_played += 1
+            if self.match_mgr.winner == Team.PLAYER:
+                self.profile.matches_won += 1
+                self.profile.crowns += 50
+                self.profile.xp += 150
+            else:
+                self.profile.crowns += 10
+                self.profile.xp += 50
+            if self.profile.xp >= self.profile.xp_max:
+                self.profile.level += 1
+                self.profile.xp -= self.profile.xp_max
+                self.profile.xp_max = int(self.profile.xp_max * 1.3)
+            self.profile.save()
 
         # 1. Update Match State transitions
         prev_state = self.match_mgr.state
@@ -670,67 +704,71 @@ class VolleyballGame:
         # 1. Beach Court & Coastal Arena
         self.court.draw()
 
-        # 2. Player Cyan Selection Ring on Sand
-        pr.draw_circle_3d(pr.Vector3(self.player.x, 0.02, self.player.z), 0.58, pr.Vector3(1, 0, 0), 90.0, pr.Color(35, 220, 245, 220))
-        pr.draw_circle_3d(pr.Vector3(self.player.x, 0.025, self.player.z), 0.44, pr.Vector3(1, 0, 0), 90.0, pr.Color(18, 25, 38, 140))
+        if self.match_mgr.state == MatchState.TITLE_SCREEN:
+            # Main Menu Center Hero: The customized player character holding the volleyball!
+            self.player.draw()
+        else:
+            # 2. Player Cyan Selection Ring on Sand
+            pr.draw_circle_3d(pr.Vector3(self.player.x, 0.02, self.player.z), 0.58, pr.Vector3(1, 0, 0), 90.0, pr.Color(35, 220, 245, 220))
+            pr.draw_circle_3d(pr.Vector3(self.player.x, 0.025, self.player.z), 0.44, pr.Vector3(1, 0, 0), 90.0, pr.Color(18, 25, 38, 140))
 
-        # 3. Render 3v3 Characters
-        for char in self.team_player:
-            char.draw()
-        for char in self.team_opponent:
-            char.draw()
+            # 3. Render 3v3 Characters
+            for char in self.team_player:
+                char.draw()
+            for char in self.team_opponent:
+                char.draw()
 
-        # 4. Ball, ground shadow & landing ring
-        self.ball.draw()
+            # 4. Ball, ground shadow & landing ring
+            self.ball.draw()
 
-        # 5. DYNAMIC TRAJECTORY BEAM & LANDING TARGET (Matching Reference Image)
-        if self.ball.in_air and not self.ball.has_bounced:
-            pred_pos = pr.Vector3(self.ball.predict_x, 0.03, self.ball.predict_z)
-            ball_pos = pr.Vector3(self.ball.x, self.ball.y, self.ball.z)
+            # 5. DYNAMIC TRAJECTORY BEAM & LANDING TARGET (Matching Reference Image)
+            if self.ball.in_air and not self.ball.has_bounced:
+                pred_pos = pr.Vector3(self.ball.predict_x, 0.03, self.ball.predict_z)
+                ball_pos = pr.Vector3(self.ball.x, self.ball.y, self.ball.z)
 
-            # Red Landing 'X' on the sand
-            x_size = 0.48
-            pr.draw_line_3d(pr.Vector3(pred_pos.x - x_size, 0.03, pred_pos.z - x_size), pr.Vector3(pred_pos.x + x_size, 0.03, pred_pos.z + x_size), pr.Color(245, 55, 65, 230))
-            pr.draw_line_3d(pr.Vector3(pred_pos.x - x_size, 0.03, pred_pos.z + x_size), pr.Vector3(pred_pos.x + x_size, 0.03, pred_pos.z - x_size), pr.Color(245, 55, 65, 230))
-            ripple_rad = 0.45 + 0.15 * math.sin(pr.get_time() * 8.0)
-            pr.draw_circle_3d(pred_pos, ripple_rad, pr.Vector3(1, 0, 0), 90.0, pr.Color(245, 55, 65, 140))
+                # Red Landing 'X' on the sand
+                x_size = 0.48
+                pr.draw_line_3d(pr.Vector3(pred_pos.x - x_size, 0.03, pred_pos.z - x_size), pr.Vector3(pred_pos.x + x_size, 0.03, pred_pos.z + x_size), pr.Color(245, 55, 65, 230))
+                pr.draw_line_3d(pr.Vector3(pred_pos.x - x_size, 0.03, pred_pos.z + x_size), pr.Vector3(pred_pos.x + x_size, 0.03, pred_pos.z - x_size), pr.Color(245, 55, 65, 230))
+                ripple_rad = 0.45 + 0.15 * math.sin(pr.get_time() * 8.0)
+                pr.draw_circle_3d(pred_pos, ripple_rad, pr.Vector3(1, 0, 0), 90.0, pr.Color(245, 55, 65, 140))
 
-            # Translucent Pink / Magenta Trajectory Ribbon from ball to landing target
-            steps = 14
-            for s in range(steps):
-                t1 = s / steps
-                t2 = (s + 1) / steps
-                p1_x = ball_pos.x + (pred_pos.x - ball_pos.x) * t1
-                p1_y = ball_pos.y * (1.0 - t1) + 0.05
-                p1_z = ball_pos.z + (pred_pos.z - ball_pos.z) * t1
+                # Translucent Pink / Magenta Trajectory Ribbon from ball to landing target
+                steps = 14
+                for s in range(steps):
+                    t1 = s / steps
+                    t2 = (s + 1) / steps
+                    p1_x = ball_pos.x + (pred_pos.x - ball_pos.x) * t1
+                    p1_y = ball_pos.y * (1.0 - t1) + 0.05
+                    p1_z = ball_pos.z + (pred_pos.z - ball_pos.z) * t1
 
-                p2_x = ball_pos.x + (pred_pos.x - ball_pos.x) * t2
-                p2_y = ball_pos.y * (1.0 - t2) + 0.05
-                p2_z = ball_pos.z + (pred_pos.z - ball_pos.z) * t2
+                    p2_x = ball_pos.x + (pred_pos.x - ball_pos.x) * t2
+                    p2_y = ball_pos.y * (1.0 - t2) + 0.05
+                    p2_z = ball_pos.z + (pred_pos.z - ball_pos.z) * t2
 
-                beam_alpha = int(120 + 90 * (1.0 - t1))
-                pr.draw_line_3d(pr.Vector3(p1_x, p1_y, p1_z), pr.Vector3(p2_x, p2_y, p2_z), pr.Color(255, 50, 160, beam_alpha))
+                    beam_alpha = int(120 + 90 * (1.0 - t1))
+                    pr.draw_line_3d(pr.Vector3(p1_x, p1_y, p1_z), pr.Vector3(p2_x, p2_y, p2_z), pr.Color(255, 50, 160, beam_alpha))
 
-            # Floating Touch Count Badge on Trajectory Arc
-            badge_y = max(0.6, ball_pos.y * 0.45)
-            badge_pos = pr.Vector3(ball_pos.x * 0.4 + pred_pos.x * 0.6, badge_y, ball_pos.z * 0.4 + pred_pos.z * 0.6)
-            pr.draw_circle_3d(badge_pos, 0.32, pr.Vector3(0, 1, 0), 0.0, pr.Color(255, 255, 255, 240))
-            pr.draw_circle_3d(badge_pos, 0.32, pr.Vector3(1, 0, 0), 90.0, pr.Color(40, 210, 220, 230))
+                # Floating Touch Count Badge on Trajectory Arc
+                badge_y = max(0.6, ball_pos.y * 0.45)
+                badge_pos = pr.Vector3(ball_pos.x * 0.4 + pred_pos.x * 0.6, badge_y, ball_pos.z * 0.4 + pred_pos.z * 0.6)
+                pr.draw_circle_3d(badge_pos, 0.32, pr.Vector3(0, 1, 0), 0.0, pr.Color(255, 255, 255, 240))
+                pr.draw_circle_3d(badge_pos, 0.32, pr.Vector3(1, 0, 0), 90.0, pr.Color(40, 210, 220, 230))
 
-        # 6. PINK CROSSHAIR AIMING RETICLE (Matching Reference Image)
-        if self.match_mgr.state in [MatchState.SERVE_READY, MatchState.SERVE_TOSSED, MatchState.IN_RALLY]:
-            ax, az = self.aim_target_x, self.aim_target_z
-            pink_col = pr.Color(255, 45, 145, 255)
-            cs = 0.55
-            pr.draw_line_3d(pr.Vector3(ax - cs, 0.035, az), pr.Vector3(ax + cs, 0.035, az), pink_col)
-            pr.draw_line_3d(pr.Vector3(ax, 0.035, az - cs), pr.Vector3(ax, 0.035, az + cs), pink_col)
-            pr.draw_circle_3d(pr.Vector3(ax, 0.03, az), 0.16, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 45, 145, 120))
+            # 6. PINK CROSSHAIR AIMING RETICLE (Matching Reference Image)
+            if self.match_mgr.state in [MatchState.SERVE_READY, MatchState.SERVE_TOSSED, MatchState.IN_RALLY]:
+                ax, az = self.aim_target_x, self.aim_target_z
+                pink_col = pr.Color(255, 45, 145, 255)
+                cs = 0.55
+                pr.draw_line_3d(pr.Vector3(ax - cs, 0.035, az), pr.Vector3(ax + cs, 0.035, az), pink_col)
+                pr.draw_line_3d(pr.Vector3(ax, 0.035, az - cs), pr.Vector3(ax, 0.035, az + cs), pink_col)
+                pr.draw_circle_3d(pr.Vector3(ax, 0.03, az), 0.16, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 45, 145, 120))
 
         pr.end_mode_3d()
 
         # --- 2D UI & Overlays ---
         if self.match_mgr.state == MatchState.TITLE_SCREEN:
-            self.ui.draw_title_screen(self.ai_diff, self.audio_mgr, self.input_mgr, self.cam_ctrl)
+            self.ui.draw_title_screen(self.ai_diff, self.audio_mgr, self.input_mgr, self.cam_ctrl, self.profile, self.player)
         else:
             self.ui.draw_hud(self.match_mgr, self.input_mgr, self.cam_ctrl, self.ai_diff, self.player)
             self.ui.draw_serve_prompt(self.match_mgr, self.input_mgr)

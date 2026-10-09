@@ -65,6 +65,7 @@ class MatchState(Enum):
 
 class PlayerAction(Enum):
     IDLE = auto()
+    MENU_IDLE = auto()   # Posed in main menu holding ball under arm
     RUN = auto()
     JUMP = auto()
     SERVE_HOLD = auto()   # Ready stance holding ball in hands at baseline
