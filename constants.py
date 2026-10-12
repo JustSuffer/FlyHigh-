@@ -39,22 +39,24 @@ PLAYER_HEIGHT = 1.85
 PLAYER_SPEED = 7.8                # Running speed (m/s)
 PLAYER_SPRINT_SPEED = 10.8        # Dive / Sprint speed
 PLAYER_JUMP_FORCE = 7.4           # Standard jump velocity (m/s)
-PLAYER_SUPER_JUMP_FORCE = 10.5     # Charged Super Jump velocity (clears net height easily!)
-PLAYER_REACH_RADIUS = 1.8         # Hit reach sphere
-PLAYER_SPIKE_REACH = 2.3          # Reach in air for spikes
-BLOCK_REACH_RADIUS = 1.45         # Net block reach radius
+PLAYER_SUPER_JUMP_FORCE = 10.2     # Charged Super Jump velocity
+PLAYER_BAM_JUMP_FORCE = 12.8       # Max BAM Jump (clears high above net!)
+PLAYER_REACH_RADIUS = 1.9         # Hit reach sphere
+PLAYER_SPIKE_REACH = 2.4          # Reach in air for spikes
+BLOCK_REACH_RADIUS = 2.4          # Net block reach radius (generous and reliable)
 
 # Aiming System
-AIM_OFFSET_MAX_X = 3.8
-AIM_OFFSET_MAX_Z = 7.8
+AIM_OFFSET_MAX_X = 4.5
+AIM_OFFSET_MAX_Z = 8.5
 
 # Teams and Roles
 class Team(Enum):
-    PLAYER = 0      # Near side (Z negative: -9 to 0)
-    OPPONENT = 1    # Far side (Z positive: 0 to +9)
+    PLAYER = 0      # Near side (Z negative)
+    OPPONENT = 1    # Far side (Z positive)
 
 class MatchState(Enum):
     TITLE_SCREEN = auto()
+    MATCH_SETUP = auto()  # Format & Arena selection screen
     SERVE_READY = auto()
     SERVE_TOSSED = auto()
     IN_RALLY = auto()
@@ -68,6 +70,7 @@ class PlayerAction(Enum):
     MENU_IDLE = auto()   # Posed in main menu holding ball under arm
     RUN = auto()
     JUMP = auto()
+    BAM_CHARGE = auto()  # Deep athletic squat charging up BAM jump
     SERVE_HOLD = auto()   # Ready stance holding ball in hands at baseline
     SERVE_TOSS = auto()   # Upward toss release animation
     BUMP = auto()         # Bump / Dig / Receive (L-CTRL or Bump)
@@ -97,12 +100,38 @@ RESOLUTIONS = [
 ]
 
 class GameMode(Enum):
-    TEAM_3V3 = "3 vs 3 (Full Team Match)"
-    SOLO_1V1 = "1 vs 1 (Solo Match)"
-    PRACTICE = "Free Practice"
+    MODE_2V2 = "2 vs 2 (Beach Duos)"
+    MODE_3V3 = "3 vs 3 (Arcade Trio)"
+    MODE_4V4 = "4 vs 4 (Squad Clash)"
+    MODE_5V5 = "5 vs 5 (Pro Team)"
+    MODE_6V6 = "6 vs 6 (Full Olympic)"
+
+MODE_CONFIGS = {
+    GameMode.MODE_2V2: {"team_size": 2, "court_length": 18.0, "court_width": 9.0,  "name": "2v2 Beach Duos"},
+    GameMode.MODE_3V3: {"team_size": 3, "court_length": 19.0, "court_width": 10.4, "name": "3v3 Arcade Trio"},
+    GameMode.MODE_4V4: {"team_size": 4, "court_length": 23.0, "court_width": 12.0, "name": "4v4 Squad Clash"},
+    GameMode.MODE_5V5: {"team_size": 5, "court_length": 26.0, "court_width": 13.5, "name": "5v5 Pro Team"},
+    GameMode.MODE_6V6: {"team_size": 6, "court_length": 29.0, "court_width": 15.0, "name": "6v6 Full Olympic"},
+}
+
+class CourtArena(Enum):
+    BEACH = "Coastal Beach"
+    ORANGE_ARENA = "Orange Pro Arena"
+    SKY_HIGH = "Sky High Clouds"
+    CRUISE_SHIP = "Cruise Ship Deck"
+    HIGH_SCHOOL_GYM = "High School Gym"
+
+ARENAS = [
+    CourtArena.BEACH,
+    CourtArena.ORANGE_ARENA,
+    CourtArena.SKY_HIGH,
+    CourtArena.CRUISE_SHIP,
+    CourtArena.HIGH_SCHOOL_GYM
+]
 
 class AIDifficulty(Enum):
     EASY = "Easy (Casual)"
     MEDIUM = "Normal (Arcade)"
     HARD = "Hard (Challenger)"
+
 

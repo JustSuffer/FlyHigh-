@@ -48,8 +48,10 @@ class Ball:
         # Special shot types & trails
         self.is_float = False
         self.is_spike = False
+        self.is_green_timing = False
+        self.green_vfx_type = "FIRE"
         self.flight_time = 0.0
-        self.trail = []  # List of (Vector3, color, alpha)
+        self.trail = []  # List of (x, y, z, is_spike, is_float, is_green, vfx_type)
         self.hit_cooldown = 0.0
 
     def reset(self, x=0.0, y=2.0, z=-7.5, team=None):
@@ -68,6 +70,8 @@ class Ball:
         self.net_touched = False
         self.is_float = False
         self.is_spike = False
+        self.is_green_timing = False
+        self.green_vfx_type = "FIRE"
         self.flight_time = 0.0
         self.trail.clear()
         self.hit_cooldown = 0.0
@@ -108,9 +112,10 @@ class Ball:
                 self.vy -= 10.0 * dt
 
         # Record trail points for high-energy visual feedback
-        if len(self.trail) > 16:
+        max_trail = 24 if self.is_green_timing else 16
+        if len(self.trail) > max_trail:
             self.trail.pop(0)
-        self.trail.append((self.x, self.y, self.z, self.is_spike, self.is_float))
+        self.trail.append((self.x, self.y, self.z, self.is_spike, self.is_float, self.is_green_timing, self.green_vfx_type))
 
         # 2. Check Net Collision (Z = 0 plane)
         prev_z = self.z
@@ -189,7 +194,7 @@ class Ball:
         self.predict_x = self.x
         self.predict_z = self.z
 
-    def launch_arc(self, target_x, target_z, peak_height=4.8, is_spike=False, is_float=False, spike_speed=24.0, hitter=None):
+    def launch_arc(self, target_x, target_z, peak_height=4.8, is_spike=False, is_float=False, is_green_timing=False, green_vfx_type="FIRE", spike_speed=24.0, hitter=None):
         """
         Calculates exact initial velocity vector (vx, vy, vz)
         to arc from current position to (target_x, target_z).
@@ -200,6 +205,8 @@ class Ball:
         self.net_touched = False
         self.is_spike = is_spike
         self.is_float = is_float
+        self.is_green_timing = is_green_timing
+        self.green_vfx_type = green_vfx_type
         self.flight_time = 0.0
         self.trail.clear()
         self.hit_cooldown = 0.32  # Prevents multi-frame repeated contact!
@@ -244,13 +251,30 @@ class Ball:
 
     def draw(self):
         """Renders the 3D volleyball, dynamic trails, ground shadow, and landing target ring."""
-        # 0. High-Energy Particle Trails
+        # 0. High-Energy Particle Trails & Green Timing Anime VFX
         if self.in_air and len(self.trail) > 1:
             for idx, pt in enumerate(self.trail):
-                tx, ty, tz, was_spike, was_float = pt
+                tx, ty, tz, was_spike, was_float, was_green, vfx_type = pt
                 prog = idx / len(self.trail)
-                rad = BALL_RADIUS * 0.45 * prog
-                if was_spike:
+                rad = BALL_RADIUS * (0.75 if was_green else 0.45) * prog
+                
+                if was_green:
+                    if vfx_type == "FIRE":
+                        col_outer = pr.Color(255, int(50 + 170 * prog), 15, int(210 * prog))
+                        pr.draw_sphere(pr.Vector3(tx, ty, tz), rad, col_outer)
+                        col_inner = pr.Color(255, 235, 60, int(240 * prog))
+                        pr.draw_sphere(pr.Vector3(tx, ty, tz), rad * 0.55, col_inner)
+                    elif vfx_type == "LIGHTNING":
+                        col_outer = pr.Color(30, 210, 255, int(220 * prog))
+                        pr.draw_sphere(pr.Vector3(tx, ty, tz), rad, col_outer)
+                        col_inner = pr.Color(240, 255, 255, int(250 * prog))
+                        pr.draw_sphere(pr.Vector3(tx, ty, tz), rad * 0.5, col_inner)
+                    else:  # WATER
+                        col_outer = pr.Color(25, 140, 255, int(200 * prog))
+                        pr.draw_sphere(pr.Vector3(tx, ty, tz), rad, col_outer)
+                        col_inner = pr.Color(160, 235, 255, int(230 * prog))
+                        pr.draw_sphere(pr.Vector3(tx, ty, tz), rad * 0.65, col_inner)
+                elif was_spike:
                     col = pr.Color(255, int(80 + 140 * prog), 30, int(180 * prog))
                     pr.draw_sphere(pr.Vector3(tx, ty, tz), rad, col)
                 elif was_float:
@@ -318,3 +342,17 @@ class Ball:
         # Knuckleball Float shimmer halo
         if self.is_float and self.in_air:
             pr.draw_sphere(pos, BALL_RADIUS * 1.25, pr.Color(60, 220, 255, 80))
+
+        # Green Timing Blazing Energy Aura around Ball
+        if self.is_green_timing and self.in_air:
+            pulse = 1.0 + 0.18 * math.sin(pr.get_time() * 24.0)
+            if self.green_vfx_type == "FIRE":
+                pr.draw_sphere(pos, BALL_RADIUS * 1.48 * pulse, pr.Color(255, 110, 20, 150))
+                pr.draw_sphere(pos, BALL_RADIUS * 1.85 * pulse, pr.Color(255, 50, 10, 85))
+            elif self.green_vfx_type == "LIGHTNING":
+                pr.draw_sphere(pos, BALL_RADIUS * 1.45 * pulse, pr.Color(50, 230, 255, 160))
+                pr.draw_sphere(pos, BALL_RADIUS * 1.80 * pulse, pr.Color(20, 140, 255, 90))
+            else:  # WATER
+                pr.draw_sphere(pos, BALL_RADIUS * 1.45 * pulse, pr.Color(40, 180, 255, 150))
+                pr.draw_sphere(pos, BALL_RADIUS * 1.85 * pulse, pr.Color(180, 240, 255, 95))
+

@@ -13,7 +13,7 @@ import pyray as pr
 import math
 from constants import (
     PLAYER_RADIUS, PLAYER_HEIGHT, PLAYER_SPEED, PLAYER_SPRINT_SPEED,
-    PLAYER_JUMP_FORCE, PLAYER_SUPER_JUMP_FORCE, PLAYER_REACH_RADIUS, PLAYER_SPIKE_REACH,
+    PLAYER_JUMP_FORCE, PLAYER_SUPER_JUMP_FORCE, PLAYER_BAM_JUMP_FORCE, PLAYER_REACH_RADIUS, PLAYER_SPIKE_REACH,
     Team, PlayerAction, GRAVITY
 )
 
@@ -36,6 +36,7 @@ class Character:
         self.jersey_num = jersey_num
         self.name = name
         self.is_ai = is_ai
+        self.is_bam_jump = False
         
         # Customization attributes
         self.color_skin = COLOR_SKIN
@@ -122,20 +123,33 @@ class Character:
         self.vz = 0.0
         self.is_grounded = True
         self.is_super_jump = False
+        self.is_bam_jump = False
         self.jump_charge = 0.0
         self.action = PlayerAction.IDLE
         self.action_timer = 0.0
         self.action_duration = 0.35
         self.facing_angle = 0.0 if self.team == Team.PLAYER else math.pi
 
-    def jump(self, is_super=False):
+    def jump(self, is_super=False, is_bam=False):
         if self.is_grounded and self.action != PlayerAction.ROLL_DIG:
-            self.vy = PLAYER_SUPER_JUMP_FORCE if is_super else PLAYER_JUMP_FORCE
-            self.is_super_jump = is_super
+            if is_bam:
+                self.vy = PLAYER_BAM_JUMP_FORCE
+                self.is_bam_jump = True
+                self.is_super_jump = True
+                self.action_duration = 0.65
+            elif is_super:
+                self.vy = PLAYER_SUPER_JUMP_FORCE
+                self.is_bam_jump = False
+                self.is_super_jump = True
+                self.action_duration = 0.45
+            else:
+                self.vy = PLAYER_JUMP_FORCE
+                self.is_bam_jump = False
+                self.is_super_jump = False
+                self.action_duration = 0.35
             self.is_grounded = False
             self.action = PlayerAction.JUMP
             self.action_timer = 0.0
-            self.action_duration = 0.45 if is_super else 0.35
 
     def trigger_action(self, action, duration=0.35):
         self.action = action
@@ -245,31 +259,55 @@ class Character:
             pr.Color(15, 18, 25, shadow_alpha)
         )
 
-        # Super Jump High Leap Aura Ring
+        # Super Jump High Leap Aura Ring & BAM Jump Fire Explosion
         if self.is_super_jump and not self.is_grounded:
             glow_pulse = 0.55 + 0.1 * math.sin(self.anim_time * 20.0)
             pr.draw_circle_3d(pr.Vector3(px, 0.05, pz), glow_pulse, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 220, 60, 160))
             pr.draw_circle_3d(pr.Vector3(px, py * 0.5, pz), 0.35, pr.Vector3(1, 0, 0), 90.0, pr.Color(80, 220, 255, 120))
+            if self.is_bam_jump:
+                # Blazing golden & cyan anime ascension rings
+                pr.draw_circle_3d(pr.Vector3(px, py * 0.3, pz), 0.75, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 160, 20, 190))
+                pr.draw_circle_3d(pr.Vector3(px, py * 0.8, pz), 0.55, pr.Vector3(1, 0, 0), 90.0, pr.Color(30, 220, 255, 180))
+                pr.draw_sphere(pr.Vector3(px, py * 0.9, pz), 0.40, pr.Color(255, 235, 60, 120))
+
+        # Charging BAM Jump Swirling Floor Particles
+        if self.is_grounded and (self.jump_charge > 0.05 or self.action == PlayerAction.BAM_CHARGE):
+            c_ring = 0.35 + self.jump_charge * 0.55
+            pr.draw_circle_3d(pr.Vector3(px, 0.04, pz), c_ring, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 200, 30, 180))
+            pr.draw_circle_3d(pr.Vector3(px, 0.045, pz), c_ring * 0.7, pr.Vector3(1, 0, 0), 90.0, pr.Color(255, 80, 20, 190))
 
         # Procedural animation cycles
         run_cycle = math.sin(self.anim_time * 15.0) if self.action == PlayerAction.RUN else 0.0
         idle_bob  = math.sin(self.anim_time * 4.0) * 0.02 if self.action == PlayerAction.IDLE else 0.0
         leg_swing = run_cycle * 0.22
 
-        base_y = py + idle_bob
+        # Athletic crouch drop during BAM charge or Receive
+        crouch = 0.0
+        if self.is_grounded and (self.jump_charge > 0.05 or self.action == PlayerAction.BAM_CHARGE):
+            crouch = min(0.38, max(0.12, self.jump_charge * 0.42))
+        elif self.is_grounded and self.action == PlayerAction.BUMP:
+            crouch = 0.20
 
-        # 2. SNEAKERS & SOCKS (Blue base, purple collar, white sole)
-        # Left Foot
+        base_y = py + idle_bob - crouch
+
+        # In-air dynamic leg flex (knees bent backwards athletically, toes pointed down)
+        air_tuck_y = 0.0
+        air_tuck_z = 0.0
+        if not self.is_grounded:
+            air_tuck_y = 0.16
+            air_tuck_z = -0.15
+
+        # Foot stance width & positions
+        stance_spread = 0.24 if crouch > 0.1 else 0.16
         lf_pos = pr.Vector3(
-            px - right_x * 0.16 + forward_x * leg_swing,
-            base_y + 0.1,
-            pz - right_z * 0.16 + forward_z * leg_swing
+            px - right_x * stance_spread + forward_x * (leg_swing + air_tuck_z),
+            base_y + 0.1 + air_tuck_y,
+            pz - right_z * stance_spread + forward_z * (leg_swing + air_tuck_z)
         )
-        # Right Foot
         rf_pos = pr.Vector3(
-            px + right_x * 0.16 - forward_x * leg_swing,
-            base_y + 0.1,
-            pz + right_z * 0.16 - forward_z * leg_swing
+            px + right_x * stance_spread - forward_x * (leg_swing - air_tuck_z),
+            base_y + 0.1 + air_tuck_y,
+            pz + right_z * stance_spread - forward_z * (leg_swing - air_tuck_z)
         )
 
         # Shoe body (Rounded capsule / spheres)
@@ -422,7 +460,14 @@ class Character:
         s1 = pr.Vector3(px - right_x * 0.22, base_y + 1.14, pz - right_z * 0.22)
         s2 = pr.Vector3(px + right_x * 0.22, base_y + 1.14, pz + right_z * 0.22)
 
-        if self.action == PlayerAction.SERVE_HOLD:
+        if self.is_grounded and (self.jump_charge > 0.05 or self.action == PlayerAction.BAM_CHARGE):
+            # Coiling Windup Arms for Explosive Leap: Hands swept backward and low
+            h1 = pr.Vector3(px - forward_x * 0.28 - right_x * 0.28, base_y + 0.65, pz - forward_z * 0.28 - right_z * 0.28)
+            h2 = pr.Vector3(px - forward_x * 0.28 + right_x * 0.28, base_y + 0.65, pz - forward_z * 0.28 + right_z * 0.28)
+            self._draw_arm(s1, h1, hand_rad, is_right=False)
+            self._draw_arm(s2, h2, hand_rad, is_right=True)
+
+        elif self.action == PlayerAction.SERVE_HOLD:
             # Server Stance: Ready crouch holding the ball firmly in both hands
             hold_bob = math.sin(self.anim_time * 3.5) * 0.02
             bc_x = px + forward_x * 0.52
